@@ -1,13 +1,13 @@
 {
   "domain": "dte_rates",
   "name": "DTE Residential Rates",
-  "version": "0.2.0",
-  "documentation": "https://github.com/javaDevJT/DTE-Rates-for-Home-Assistant#readme",
-  "issue_tracker": "https://github.com/javaDevJT/DTE-Rates-for-Home-Assistant/issues",
   "codeowners": ["@javaDevJT"],
-  "integration_type": "service",
-  "dependencies": ["http"],
-  "requirements": ["pypdf==5.4.0"],
   "config_flow": true,
-  "iot_class": "cloud_polling"
+  "dependencies": ["http"],
+  "documentation": "https://github.com/javaDevJT/DTE-Rates-for-Home-Assistant#readme",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/javaDevJT/DTE-Rates-for-Home-Assistant/issues",
+  "requirements": ["pypdf==5.4.0"],
+  "version": "0.2.0"
 }
