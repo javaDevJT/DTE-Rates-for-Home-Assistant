@@ -30,7 +30,7 @@ A Home Assistant custom integration that pulls the official DTE residential elec
 ### Option A: HACS (Recommended)
 
 1. Open HACS -> Integrations -> three-dot menu -> Custom repositories.
-2. Add this repository URL and set category to **Integration**.
+2. Add repository URL `https://github.com/javaDevJT/DTE-Rates-for-Home-Assistant` and set category to **Integration**.
 3. Install **DTE Residential Rates** from HACS.
 4. Restart Home Assistant.
 5. Go to Settings -> Devices & Services -> Add Integration.
