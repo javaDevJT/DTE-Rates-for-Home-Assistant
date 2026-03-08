@@ -22,14 +22,9 @@ FRONTEND_URL_PATH = "/dte_rates_files"
 FRONTEND_CARD_JS = "dte-rates-card.js"
 
 
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     await _async_register_frontend(hass)
-    _async_register_services(hass)
-    return True
-
-
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _async_register_services(hass)
     coordinator = DteRateCoordinator(hass, entry)
 
@@ -72,6 +67,8 @@ def _async_unregister_services(hass: HomeAssistant) -> None:
 
 
 async def _async_register_frontend(hass: HomeAssistant) -> None:
+    if hass.data[DOMAIN].get("_frontend_registered"):
+        return
     frontend_path = Path(__file__).parent / "frontend"
     await hass.http.async_register_static_paths(
         [
@@ -82,6 +79,7 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
             )
         ]
     )
+    hass.data[DOMAIN]["_frontend_registered"] = True
 
 
 def _make_refresh_handler(hass: HomeAssistant):
