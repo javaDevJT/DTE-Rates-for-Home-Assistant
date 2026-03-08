@@ -78,6 +78,41 @@ class _FakeReader:
         self.pages = [_FakePage()]
 
 
+REAL_D111_EXCERPT = """
+Time of Day 3 p.m. - 7 p.m. Standard Base Rate (D1.11)
+Peak hours: Monday-Friday 3 p.m. to 7 p.m.
+Power Supply Charges:
+June through September
+ All peak kWh
+  Capacity Energy .................. 5.360¢ per kWh
+  Non-Capacity Energy ............... 9.047¢ per kWh
+ All off-peak kWh
+  Capacity Energy ................... 3.240¢ per kWh
+  Non-Capacity Energy ............... 5.469¢ per kWh
+October through May
+ All peak kWh
+  Capacity Energy ................... 3.839¢ per kWh
+  Non-Capacity Energy .............. 6.480¢ per kWh
+ All off-peak kWh
+  Capacity Energy ................... 3.240¢ per kWh
+  Non-Capacity Energy ............... 5.469¢ per kWh
+Delivery Charges:
+ Service Charge ....................... $8.50 per month
+ RIA Credit* ......................... ($8.50) per month
+ Distribution kWh (Year-round) ......... 9.726¢ per kWh
+"""
+
+
+class _RealD111Page:
+    def extract_text(self):
+        return REAL_D111_EXCERPT
+
+
+class _RealD111Reader:
+    def __init__(self, _bytes):
+        self.pages = [_RealD111Page()]
+
+
 def test_parse_rate_card_extracts_rates_and_effective_date(monkeypatch):
     monkeypatch.setattr("custom_components.dte_rates.pdf_parser.PdfReader", _FakeReader)
 
@@ -101,6 +136,12 @@ def test_parse_rate_card_tracks_seasonal_and_period_components(monkeypatch):
     assert peak.season_name == "june_through_september"
     assert peak.components.per_kwh["capacity_energy"] == Decimal("5.949")
     assert super_off_peak.components.per_kwh["distribution_super_off_peak_kwh"] == Decimal("4.892")
+
+    d111 = parsed.rates["D1.11"]
+    d111_peak = next(p for p in d111.periods if p.period_name == "peak")
+    d111_off_peak = next(p for p in d111.periods if p.period_name == "off_peak")
+    assert d111_peak.components.per_kwh["distribution_kwh_year_round"] == Decimal("9.726")
+    assert d111_off_peak.components.per_kwh["distribution_kwh_year_round"] == Decimal("9.726")
 
 
 def test_parser_infers_time_windows_from_text(monkeypatch):
@@ -127,3 +168,15 @@ def test_parser_supports_new_period_labels_without_code_changes(monkeypatch):
     assert ultra.window.weekdays_only is True
     assert ultra.window.hour_ranges == [(0, 5)]
     assert ultra.components.per_kwh["capacity_energy"] == Decimal("1.111")
+
+
+def test_real_d111_excerpt_applies_year_round_distribution_to_all_tou_periods(monkeypatch):
+    monkeypatch.setattr("custom_components.dte_rates.pdf_parser.PdfReader", _RealD111Reader)
+    parsed = parse_rate_card_pdf(b"fake", "https://example.test/card.pdf")
+
+    d111 = parsed.rates["D1.11"]
+    for season in ("june_through_september", "october_through_may"):
+        peak = next(p for p in d111.periods if p.season_name == season and p.period_name == "peak")
+        off_peak = next(p for p in d111.periods if p.season_name == season and p.period_name == "off_peak")
+        assert peak.components.per_kwh["distribution_kwh_year_round"] == Decimal("9.726")
+        assert off_peak.components.per_kwh["distribution_kwh_year_round"] == Decimal("9.726")

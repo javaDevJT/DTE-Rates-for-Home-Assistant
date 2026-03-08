@@ -271,13 +271,14 @@ def _parse_rate_section(section: str) -> tuple[list[SeasonalPeriodRate], list[st
         component_label = _normalize_key(value_match.group("label"))
         value = _to_decimal(value_match.group("value"))
         unit = value_match.group("unit").lower().replace(" ", "")
+        target_season = "year_round" if "year_round" in component_label else season
 
         if "¢perkwh" in unit:
             period_name = _period_from_component_label(component_label) or current_period
-            key = (season, period_name)
+            key = (target_season, period_name)
             per_kwh[key][component_label] = value
         else:
-            monthly_by_season[season][component_label] = value
+            monthly_by_season[target_season][component_label] = value
 
     periods: list[SeasonalPeriodRate] = []
     for (period_season, period_name), kwh_components in per_kwh.items():
@@ -292,6 +293,7 @@ def _parse_rate_section(section: str) -> tuple[list[SeasonalPeriodRate], list[st
             )
         )
 
+    periods = _merge_base_components(periods, monthly_by_season)
     return periods, notes
 
 
@@ -308,3 +310,56 @@ def _window_for_period(period_name: str, season: str, specs: dict[str, _WindowSp
         hour_ranges=list(spec.hour_ranges),
         months=_months_for(season),
     )
+
+
+def _merge_base_components(
+    periods: list[SeasonalPeriodRate],
+    monthly_by_season: dict[str, dict[str, Decimal]],
+) -> list[SeasonalPeriodRate]:
+    """Apply base all_kwh/year_round components to specific TOU periods.
+
+    Example: D1.11 has Distribution kWh (Year-round). That value should be part
+    of both peak and off-peak totals instead of existing in a separate all_kwh-only
+    period that is not the active TOU period.
+    """
+    by_key: dict[tuple[str, str], SeasonalPeriodRate] = {
+        (p.season_name, p.period_name): p for p in periods
+    }
+    has_specific_periods = any(p.period_name != "all_kwh" for p in periods)
+    if not has_specific_periods:
+        return periods
+
+    year_round_base = by_key.get(("year_round", "all_kwh"))
+
+    merged: list[SeasonalPeriodRate] = []
+    for period in periods:
+        if period.period_name == "all_kwh":
+            continue
+
+        base_for_season = by_key.get((period.season_name, "all_kwh"))
+        merged_kwh = dict(period.components.per_kwh)
+
+        for source in (year_round_base, base_for_season):
+            if source is None:
+                continue
+            for key, value in source.components.per_kwh.items():
+                merged_kwh.setdefault(key, value)
+
+        merged_monthly: dict[str, Decimal] = {}
+        for source_monthly in (
+            monthly_by_season.get("year_round", {}),
+            monthly_by_season.get(period.season_name, {}),
+        ):
+            for key, value in source_monthly.items():
+                merged_monthly.setdefault(key, value)
+
+        merged.append(
+            SeasonalPeriodRate(
+                season_name=period.season_name,
+                period_name=period.period_name,
+                components=PriceComponents(per_kwh=merged_kwh, monthly=merged_monthly),
+                window=period.window,
+            )
+        )
+
+    return merged
