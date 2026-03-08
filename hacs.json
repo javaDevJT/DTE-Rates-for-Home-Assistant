@@ -1,8 +1,4 @@
 {
   "name": "DTE Residential Rates",
-  "content_in_root": false,
-  "domains": [
-    "dte_rates"
-  ],
-  "render_readme": true
+  "content_in_root": false
 }
