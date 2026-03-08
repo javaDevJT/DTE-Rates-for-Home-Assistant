@@ -1,0 +1,10 @@
+{
+  "domain": "dte_rates",
+  "name": "DTE Residential Rates",
+  "version": "0.2.0",
+  "documentation": "https://www.dteenergy.com/us/en/residential/service-request/pricing/residential-pricing-options.html",
+  "integration_type": "service",
+  "requirements": ["pypdf==5.4.0"],
+  "config_flow": true,
+  "iot_class": "cloud_polling"
+}

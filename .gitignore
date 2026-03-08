@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+*.iml
+.claude/
+
+# Python cache/build
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Virtualenv
+.venv/
+
+# Local bundles/artifacts
+custom_components/*.zip

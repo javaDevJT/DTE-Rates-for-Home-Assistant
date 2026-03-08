@@ -1,0 +1,44 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "DTE Residential Rates",
+        "description": "Choose your DTE residential electric pricing plan.",
+        "data": {
+          "selected_rate": "Rate plan",
+          "net_metering": "Net metering enabled"
+        }
+      }
+    }
+  },
+  "services": {
+    "refresh_rate_card": {
+      "name": "Refresh DTE rate card",
+      "description": "Download and re-parse the latest DTE Residential Electric Rate Card now.",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry ID",
+          "description": "Optional. Refresh only one DTE Rates config entry."
+        }
+      }
+    },
+    "show_rate_schedule": {
+      "name": "Show rate schedule",
+      "description": "Show the full parsed schedule for a DTE rate in a persistent notification.",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry ID",
+          "description": "Optional. Uses the first configured DTE Rates entry if omitted."
+        },
+        "rate_code": {
+          "name": "Rate code",
+          "description": "Optional. Example D1.11 or D1.13. Uses the configured selected rate if omitted."
+        }
+      }
+    },
+    "show_lovelace_card_example": {
+      "name": "Show Lovelace card example",
+      "description": "Create a persistent notification with resource and YAML needed for the custom DTE card."
+    }
+  }
+}
