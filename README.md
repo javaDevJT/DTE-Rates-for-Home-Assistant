@@ -2,6 +2,7 @@
 
 [![Website](https://img.shields.io/badge/Website-javadevjt.tech-0A66C2?logo=googlechrome&logoColor=white)](https://javadevjt.tech)
 [![Buy%20Me%20a%20Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-javadevjt-FFDD00?logo=buymeacoffee&logoColor=000000)](https://buymeacoffee.com/javadevjt)
+[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=javaDevJT&repository=DTE-Rates-for-Home-Assistant&category=integration)
 
 A Home Assistant custom integration that pulls the official DTE residential electric rate card PDF, parses rates dynamically, and exposes import/export price entities that track time-of-day and season.
 
