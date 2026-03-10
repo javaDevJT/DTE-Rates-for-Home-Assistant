@@ -5,11 +5,13 @@ from collections import defaultdict
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
+from datetime import timedelta
 
 from .const import (
     ATTR_CARD_EFFECTIVE_DATE,
@@ -65,6 +67,18 @@ class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._entry = entry
         self._notification_id = f"dte_rates_missing_rate_{entry.entry_id}"
+
+    async def async_added_to_hass(self) -> None:
+        remove_listener = async_track_time_interval(
+            self.hass,
+            self._handle_time_interval,
+            timedelta(minutes=1),
+        )
+        self.async_on_remove(remove_listener)
+
+    @callback
+    def _handle_time_interval(self, _now) -> None:
+        self.async_write_ha_state()
 
     def _selected_rate(self) -> RatePlan | None:
         selected = self._entry.data[CONF_SELECTED_RATE]

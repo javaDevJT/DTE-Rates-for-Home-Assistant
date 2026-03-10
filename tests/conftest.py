@@ -64,6 +64,15 @@ def _stub_homeassistant() -> None:
         def __init__(self, coordinator):
             self.coordinator = coordinator
 
+        async def async_added_to_hass(self):
+            return None
+
+        def async_on_remove(self, _remove_callback):
+            return None
+
+        def async_write_ha_state(self):
+            return None
+
     class SensorEntity:
         @property
         def native_unit_of_measurement(self):
@@ -76,6 +85,9 @@ def _stub_homeassistant() -> None:
 
     class HomeAssistant:
         pass
+
+    def callback(func):
+        return func
 
     class DeviceEntryType:
         SERVICE = "service"
@@ -99,7 +111,7 @@ def _stub_homeassistant() -> None:
             FlowResult=FlowResult,
         ),
         "homeassistant.data_entry_flow": _make_module("homeassistant.data_entry_flow", FlowResult=FlowResult),
-        "homeassistant.core": _make_module("homeassistant.core", HomeAssistant=HomeAssistant),
+        "homeassistant.core": _make_module("homeassistant.core", HomeAssistant=HomeAssistant, callback=callback),
         "homeassistant.helpers": _make_module("homeassistant.helpers"),
         "homeassistant.helpers.update_coordinator": _make_module(
             "homeassistant.helpers.update_coordinator",
@@ -108,6 +120,10 @@ def _stub_homeassistant() -> None:
             CoordinatorEntity=CoordinatorEntity,
         ),
         "homeassistant.helpers.entity_platform": _make_module("homeassistant.helpers.entity_platform", AddEntitiesCallback=MagicMock()),
+        "homeassistant.helpers.event": _make_module(
+            "homeassistant.helpers.event",
+            async_track_time_interval=MagicMock(return_value=lambda: None),
+        ),
         "homeassistant.helpers.aiohttp_client": _make_module("homeassistant.helpers.aiohttp_client", async_get_clientsession=MagicMock()),
         "homeassistant.helpers.device_registry": _make_module("homeassistant.helpers.device_registry", DeviceEntryType=DeviceEntryType),
         "homeassistant.components": _make_module("homeassistant.components"),

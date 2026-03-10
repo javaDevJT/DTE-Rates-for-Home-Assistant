@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+import pytest
 
 from homeassistant.components import persistent_notification
 from custom_components.dte_rates.const import CONF_NET_METERING, CONF_SELECTED_RATE
@@ -206,3 +207,33 @@ def test_available_rate_dismisses_existing_notification(monkeypatch):
 
     create_mock.assert_not_called()
     dismiss_mock.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_sensor_registers_time_interval_refresh(monkeypatch):
+    monkeypatch.setattr("custom_components.dte_rates.sensor.dt_util.now", lambda: datetime(2026, 3, 1, 12, 0))
+    track_mock = MagicMock(return_value=lambda: None)
+    monkeypatch.setattr("custom_components.dte_rates.sensor.async_track_time_interval", track_mock)
+
+    coordinator = _coordinator_with_rate()
+    entry = SimpleNamespace(entry_id="entry_11", data={CONF_SELECTED_RATE: "D1.11", CONF_NET_METERING: False})
+    sensor = DteImportRateSensor(coordinator, entry)
+    sensor.hass = SimpleNamespace()
+    sensor.async_on_remove = MagicMock()
+
+    await sensor.async_added_to_hass()
+
+    track_mock.assert_called_once()
+    sensor.async_on_remove.assert_called_once()
+
+
+def test_time_interval_callback_writes_state(monkeypatch):
+    monkeypatch.setattr("custom_components.dte_rates.sensor.dt_util.now", lambda: datetime(2026, 3, 1, 12, 0))
+    coordinator = _coordinator_with_rate()
+    entry = SimpleNamespace(entry_id="entry_12", data={CONF_SELECTED_RATE: "D1.11", CONF_NET_METERING: False})
+    sensor = DteImportRateSensor(coordinator, entry)
+    sensor.async_write_ha_state = MagicMock()
+
+    sensor._handle_time_interval(None)
+
+    sensor.async_write_ha_state.assert_called_once()
