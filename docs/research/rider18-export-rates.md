@@ -4,11 +4,11 @@
 
 - Enhancement request: calculate Rider 18 export credits to match DTE's Rider 18 calculator.
 - Residential rate card: source of the active generation components for each rate period.
-- Rider 18 calculator workbook: source of the current PSCR scalar.
+- MPSC DTE electric rate book: source of the current PSCR scalar.
 
 ## Implementation Decision
 
-Do not use the Rider 18 calculator workbook's period-specific outflow credits as the authoritative rates. The workbook is used only to extract the current PSCR value, because the residential rate card PDF does not include that scalar.
+Do not use the Rider 18 calculator workbook's period-specific outflow credits as the authoritative rates. PSCR is parsed dynamically from the MPSC DTE electric rate book PDF at `https://www.michigan.gov/-/media/Project/Websites/mpsc/consumer/rate-books/electric/dte/dtee1cur.pdf`, because the residential rate card PDF does not include that scalar.
 
 Formula:
 

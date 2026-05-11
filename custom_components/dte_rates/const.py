@@ -6,9 +6,9 @@ RATE_CARD_URL = (
     "residential/Service-Request/pricing/residential-pricing-options/"
     "ResidentialElectricRateCard.pdf"
 )
-RIDER18_CALCULATOR_URL = (
-    "https://www.dteenergy.com/content/dam/dteenergy/deg/website/"
-    "hybris/rooftop-solar/Rider18Calculator.xlsx"
+PSCR_RATE_BOOK_URL = (
+    "https://www.michigan.gov/-/media/Project/Websites/mpsc/consumer/"
+    "rate-books/electric/dte/dtee1cur.pdf"
 )
 
 UPDATE_INTERVAL = timedelta(days=7)

@@ -43,7 +43,7 @@ def _coordinator_with_rate() -> SimpleNamespace:
             rates={"D1.11": rate},
             raw_text_hash="hash",
             pscr_cents=Decimal("1.877"),
-            pscr_source_url="https://example.test/Rider18Calculator.xlsx",
+            pscr_source_url="https://www.michigan.gov/-/media/Project/Websites/mpsc/consumer/rate-books/electric/dte/dtee1cur.pdf",
         )
     )
 
