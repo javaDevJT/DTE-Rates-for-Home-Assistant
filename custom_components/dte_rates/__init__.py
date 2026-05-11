@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.components import persistent_notification
 
-from .const import DOMAIN
+from .const import CONF_NET_METERING, CONF_SELECTED_RATE, DOMAIN
 from .coordinator import DteRateCoordinator
 from .rate_calculator import current_export_rate_cents, current_import_rate_cents, period_display_name
 
@@ -110,20 +110,22 @@ def _make_show_schedule_handler(hass: HomeAssistant):
         if coordinator is None:
             return
 
+        entry = next((e for e in hass.config_entries.async_entries(DOMAIN) if e.entry_id == entry_id), None)
         rate_code = call.data.get("rate_code")
         if rate_code:
             rate = coordinator.data.rates.get(rate_code)
         else:
-            entry = next((e for e in hass.config_entries.async_entries(DOMAIN) if e.entry_id == entry_id), None)
-            rate = coordinator.data.rates.get(entry.data.get("selected_rate")) if entry else None
+            rate = coordinator.data.rates.get(entry.data.get(CONF_SELECTED_RATE)) if entry else None
 
         if rate is None:
             return
 
         lines_by_season: dict[str, list[str]] = defaultdict(list)
+        net_metering = entry.data.get(CONF_NET_METERING, False) if entry else False
+        pscr_cents = getattr(coordinator.data, "pscr_rates", {}).get(rate.code)
         for period in sorted(rate.periods, key=lambda p: (p.season_name, p.period_name)):
             import_usd = float(current_import_rate_cents(period) / 100)
-            export_usd = float(current_export_rate_cents(period, False) / 100)
+            export_usd = float(current_export_rate_cents(period, net_metering, pscr_cents) / 100)
             lines_by_season[period.season_name].append(
                 f"{period_display_name(period)}: Import ${import_usd:.4f}/kWh | Export ${export_usd:.4f}/kWh"
             )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from decimal import Decimal
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.components import persistent_notification
@@ -19,11 +20,18 @@ from .const import (
     ATTR_MONTHLY_COMPONENTS,
     ATTR_PERIOD,
     ATTR_CURRENT_RATE_NAME,
+    ATTR_EXPORT_RATE_SOURCE,
+    ATTR_EXPORT_RATE_WARNING,
     ATTR_NEXT_RATE_CHANGE,
     ATTR_NEXT_RATE_NAME,
     ATTR_NEXT_RATE_VALUE,
+    ATTR_PSCR_CENTS,
+    ATTR_PSCR_RATE_CODE,
+    ATTR_PSCR_RATES,
+    ATTR_PSCR_SOURCE_URL,
     ATTR_RATE_CODE,
     ATTR_RATE_NAME,
+    ATTR_RIDER18_EXPORT_AVAILABLE,
     ATTR_SCHEDULE_BY_SEASON,
     ATTR_SCHEDULE_TEXT,
     ATTR_SEASON,
@@ -41,6 +49,7 @@ from .rate_calculator import (
     get_active_period,
     get_next_rate_change,
     period_display_name,
+    rider18_export_formula_available,
 )
 
 
@@ -103,6 +112,36 @@ class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
             return None
         return get_active_period(rate, dt_util.now())
 
+    def _pscr_cents_for_rate(self, rate: RatePlan | None = None) -> Decimal | None:
+        target_rate = rate or self._selected_rate()
+        if target_rate is None:
+            return None
+        return getattr(self.coordinator.data, "pscr_rates", {}).get(target_rate.code)
+
+    def _export_rate_cents(self, period: SeasonalPeriodRate):
+        return current_export_rate_cents(
+            period,
+            self._entry.data.get(CONF_NET_METERING, False),
+            self._pscr_cents_for_rate(),
+        )
+
+    def _export_rate_source(self, period: SeasonalPeriodRate) -> str:
+        if self._entry.data.get(CONF_NET_METERING, False):
+            return "net_metering"
+        if rider18_export_formula_available(period, self._pscr_cents_for_rate()):
+            return "rider18_formula"
+        return "rider18_formula_incomplete"
+
+    def _export_rate_warning(self, period: SeasonalPeriodRate) -> str | None:
+        if self._entry.data.get(CONF_NET_METERING, False):
+            return None
+        if rider18_export_formula_available(period, self._pscr_cents_for_rate()):
+            return None
+        return (
+            "Rider 18 formula is missing a generation component or PSCR value "
+            "for the active period; using the available formula components only."
+        )
+
     def _warning(self) -> str | None:
         selected = self._entry.data[CONF_SELECTED_RATE]
         if selected not in self.coordinator.data.rates:
@@ -118,6 +157,16 @@ class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
             ATTR_SOURCE_URL: self.coordinator.data.source_url,
             ATTR_CARD_EFFECTIVE_DATE: self.coordinator.data.effective_date,
         }
+        pscr_cents = self._pscr_cents_for_rate()
+        if pscr_cents is not None:
+            attrs[ATTR_PSCR_CENTS] = float(pscr_cents)
+            rate = self._selected_rate()
+            if rate is not None:
+                attrs[ATTR_PSCR_RATE_CODE] = rate.code
+        if self.coordinator.data.pscr_rates:
+            attrs[ATTR_PSCR_RATES] = {code: float(value) for code, value in self.coordinator.data.pscr_rates.items()}
+        if self.coordinator.data.pscr_source_url:
+            attrs[ATTR_PSCR_SOURCE_URL] = self.coordinator.data.pscr_source_url
 
         rate = self._selected_rate()
         period = self._active_period()
@@ -260,13 +309,19 @@ class DteExportRateSensor(_DteBaseRateSensor):
     def extra_state_attributes(self) -> dict:
         attrs = self._base_attributes()
         attrs[CONF_NET_METERING] = self._entry.data.get(CONF_NET_METERING, False)
+        period = self._active_period()
+        if period is not None:
+            attrs[ATTR_EXPORT_RATE_SOURCE] = self._export_rate_source(period)
+            attrs[ATTR_RIDER18_EXPORT_AVAILABLE] = rider18_export_formula_available(period, self._pscr_cents_for_rate())
+            warning = self._export_rate_warning(period)
+            if warning is not None:
+                attrs[ATTR_EXPORT_RATE_WARNING] = warning
         return attrs
 
     def _period_value_usd(self, period: SeasonalPeriodRate | None) -> float | None:
         if period is None:
             return None
-        cents = current_export_rate_cents(period, self._entry.data.get(CONF_NET_METERING, False))
-        return float(cents / 100)
+        return float(self._export_rate_cents(period) / 100)
 
 
 class DteCurrentRateNameSensor(_DteBaseRateSensor):
@@ -328,7 +383,6 @@ class DteRateScheduleSensor(_DteBaseRateSensor):
 
     def _schedule_rows(self, rate: RatePlan) -> list[dict]:
         rows: list[dict] = []
-        net_metering = self._entry.data.get(CONF_NET_METERING, False)
         for period in sorted(rate.periods, key=lambda p: (p.season_name, p.period_name)):
             rows.append(
                 {
@@ -337,7 +391,7 @@ class DteRateScheduleSensor(_DteBaseRateSensor):
                     "name": period_display_name(period),
                     "time_window": self._window_summary(period),
                     "import_usd_per_kwh": round(float(current_import_rate_cents(period) / 100), 6),
-                    "export_usd_per_kwh": round(float(current_export_rate_cents(period, net_metering) / 100), 6),
+                    "export_usd_per_kwh": round(float(self._export_rate_cents(period) / 100), 6),
                 }
             )
         return rows

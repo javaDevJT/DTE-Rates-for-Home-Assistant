@@ -35,4 +35,18 @@ class DteRatesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_NET_METERING, default=False): bool,
             }
         )
-        return self.async_show_form(step_id="user", data_schema=schema)
+        return self.async_show_form(
+            step_id="user",
+            data_schema=schema,
+            description_placeholders={
+                "rider18_status": _rider18_status(coordinator.data),
+            },
+        )
+
+
+def _rider18_status(rate_card) -> str:
+    count = len(getattr(rate_card, "pscr_rates", {}))
+    if count:
+        suffix = "tariff" if count == 1 else "tariffs"
+        return f"Rider 18 export credits use parsed generation rates plus MPSC PSCR factors loaded for {count} {suffix}."
+    return "Rider 18 export credits use parsed generation rates plus MPSC PSCR when the selected tariff has a PSCR factor."

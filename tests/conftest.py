@@ -32,7 +32,7 @@ def _stub_homeassistant() -> None:
             self.hass = None
 
         def async_show_form(self, *, step_id, data_schema=None, errors=None, **kwargs):
-            return FlowResult(type="form", step_id=step_id, data_schema=data_schema, errors=errors or {})
+            return FlowResult(type="form", step_id=step_id, data_schema=data_schema, errors=errors or {}, **kwargs)
 
         def async_create_entry(self, *, title, data):
             return FlowResult(type="create_entry", title=title, data=data)

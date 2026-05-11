@@ -6,6 +6,10 @@ RATE_CARD_URL = (
     "residential/Service-Request/pricing/residential-pricing-options/"
     "ResidentialElectricRateCard.pdf"
 )
+PSCR_RATE_BOOK_URL = (
+    "https://www.michigan.gov/-/media/Project/Websites/mpsc/consumer/"
+    "rate-books/electric/dte/dtee1cur.pdf"
+)
 
 UPDATE_INTERVAL = timedelta(days=7)
 
@@ -19,6 +23,13 @@ ATTR_PERIOD = "period"
 ATTR_COMPONENTS = "components"
 ATTR_MONTHLY_COMPONENTS = "monthly_components"
 ATTR_SOURCE_URL = "source_url"
+ATTR_PSCR_CENTS = "pscr_cents"
+ATTR_PSCR_RATE_CODE = "pscr_rate_code"
+ATTR_PSCR_RATES = "pscr_rates"
+ATTR_PSCR_SOURCE_URL = "pscr_source_url"
+ATTR_RIDER18_EXPORT_AVAILABLE = "rider18_export_available"
+ATTR_EXPORT_RATE_SOURCE = "export_rate_source"
+ATTR_EXPORT_RATE_WARNING = "export_rate_warning"
 ATTR_CARD_EFFECTIVE_DATE = "card_effective_date"
 ATTR_SELECTED_RATE_AVAILABLE = "selected_rate_available"
 ATTR_WARNING = "warning"
