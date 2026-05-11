@@ -44,5 +44,9 @@ class DteRatesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
 
-def _rider18_status(_rate_card) -> str:
-    return "Rider 18 export credits use parsed generation rates plus PSCR when the PSCR value is available."
+def _rider18_status(rate_card) -> str:
+    count = len(getattr(rate_card, "pscr_rates", {}))
+    if count:
+        suffix = "tariff" if count == 1 else "tariffs"
+        return f"Rider 18 export credits use parsed generation rates plus MPSC PSCR factors loaded for {count} {suffix}."
+    return "Rider 18 export credits use parsed generation rates plus MPSC PSCR when the selected tariff has a PSCR factor."

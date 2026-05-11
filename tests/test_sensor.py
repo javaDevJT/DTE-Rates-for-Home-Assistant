@@ -42,7 +42,7 @@ def _coordinator_with_rate() -> SimpleNamespace:
             effective_date="February 6, 2025",
             rates={"D1.11": rate},
             raw_text_hash="hash",
-            pscr_cents=Decimal("1.877"),
+            pscr_rates={"D1.11": Decimal("1.877"), "D1.13": Decimal("2.222")},
             pscr_source_url="https://www.michigan.gov/-/media/Project/Websites/mpsc/consumer/rate-books/electric/dte/dtee1cur.pdf",
         )
     )
@@ -74,6 +74,7 @@ def test_export_sensor_uses_rider18_formula_without_net_metering(monkeypatch):
     assert sensor.extra_state_attributes["export_rate_source"] == "rider18_formula"
     assert sensor.extra_state_attributes["rider18_export_available"] is True
     assert sensor.extra_state_attributes["pscr_cents"] == 1.877
+    assert sensor.extra_state_attributes["pscr_rate_code"] == "D1.11"
 
 
 def test_export_sensor_ignores_rider18_credit_with_net_metering(monkeypatch):
@@ -91,7 +92,7 @@ def test_export_sensor_reports_formula_unavailable_without_pscr(monkeypatch):
     monkeypatch.setattr("custom_components.dte_rates.sensor.dt_util.now", lambda: datetime(2026, 3, 1, 12, 0))
 
     coordinator = _coordinator_with_rate()
-    coordinator.data.pscr_cents = None
+    coordinator.data.pscr_rates = {}
     coordinator.data.pscr_source_url = None
     entry = SimpleNamespace(entry_id="entry_16", data={CONF_SELECTED_RATE: "D1.11", CONF_NET_METERING: False})
 

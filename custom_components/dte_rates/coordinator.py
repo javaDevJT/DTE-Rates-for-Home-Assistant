@@ -10,7 +10,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .const import PSCR_RATE_BOOK_URL, RATE_CARD_URL, UPDATE_INTERVAL
 from .models import ParsedRateCard
 from .pdf_parser import parse_rate_card_pdf
-from .pscr_parser import parse_pscr_cents_from_pdf
+from .pscr_parser import parse_pscr_rates_from_pdf
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -65,8 +65,8 @@ class DteRateCoordinator(DataUpdateCoordinator[ParsedRateCard]):
             return parsed
 
         try:
-            parsed.pscr_cents = await self.hass.async_add_executor_job(
-                parse_pscr_cents_from_pdf,
+            parsed.pscr_rates = await self.hass.async_add_executor_job(
+                parse_pscr_rates_from_pdf,
                 pscr_bytes,
             )
             parsed.pscr_source_url = PSCR_RATE_BOOK_URL

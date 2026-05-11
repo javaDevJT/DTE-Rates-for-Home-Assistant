@@ -50,5 +50,5 @@ class ParsedRateCard:
     effective_date: str | None
     rates: dict[str, RatePlan]
     raw_text_hash: str
-    pscr_cents: Decimal | None = None
+    pscr_rates: dict[str, Decimal] = field(default_factory=dict)
     pscr_source_url: str | None = None

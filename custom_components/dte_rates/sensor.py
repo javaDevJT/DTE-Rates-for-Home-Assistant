@@ -26,6 +26,8 @@ from .const import (
     ATTR_NEXT_RATE_NAME,
     ATTR_NEXT_RATE_VALUE,
     ATTR_PSCR_CENTS,
+    ATTR_PSCR_RATE_CODE,
+    ATTR_PSCR_RATES,
     ATTR_PSCR_SOURCE_URL,
     ATTR_RATE_CODE,
     ATTR_RATE_NAME,
@@ -110,27 +112,30 @@ class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
             return None
         return get_active_period(rate, dt_util.now())
 
-    def _pscr_cents(self) -> Decimal | None:
-        return getattr(self.coordinator.data, "pscr_cents", None)
+    def _pscr_cents_for_rate(self, rate: RatePlan | None = None) -> Decimal | None:
+        target_rate = rate or self._selected_rate()
+        if target_rate is None:
+            return None
+        return getattr(self.coordinator.data, "pscr_rates", {}).get(target_rate.code)
 
     def _export_rate_cents(self, period: SeasonalPeriodRate):
         return current_export_rate_cents(
             period,
             self._entry.data.get(CONF_NET_METERING, False),
-            self._pscr_cents(),
+            self._pscr_cents_for_rate(),
         )
 
     def _export_rate_source(self, period: SeasonalPeriodRate) -> str:
         if self._entry.data.get(CONF_NET_METERING, False):
             return "net_metering"
-        if rider18_export_formula_available(period, self._pscr_cents()):
+        if rider18_export_formula_available(period, self._pscr_cents_for_rate()):
             return "rider18_formula"
         return "rider18_formula_incomplete"
 
     def _export_rate_warning(self, period: SeasonalPeriodRate) -> str | None:
         if self._entry.data.get(CONF_NET_METERING, False):
             return None
-        if rider18_export_formula_available(period, self._pscr_cents()):
+        if rider18_export_formula_available(period, self._pscr_cents_for_rate()):
             return None
         return (
             "Rider 18 formula is missing a generation component or PSCR value "
@@ -152,8 +157,14 @@ class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
             ATTR_SOURCE_URL: self.coordinator.data.source_url,
             ATTR_CARD_EFFECTIVE_DATE: self.coordinator.data.effective_date,
         }
-        if self.coordinator.data.pscr_cents is not None:
-            attrs[ATTR_PSCR_CENTS] = float(self.coordinator.data.pscr_cents)
+        pscr_cents = self._pscr_cents_for_rate()
+        if pscr_cents is not None:
+            attrs[ATTR_PSCR_CENTS] = float(pscr_cents)
+            rate = self._selected_rate()
+            if rate is not None:
+                attrs[ATTR_PSCR_RATE_CODE] = rate.code
+        if self.coordinator.data.pscr_rates:
+            attrs[ATTR_PSCR_RATES] = {code: float(value) for code, value in self.coordinator.data.pscr_rates.items()}
         if self.coordinator.data.pscr_source_url:
             attrs[ATTR_PSCR_SOURCE_URL] = self.coordinator.data.pscr_source_url
 
@@ -301,7 +312,7 @@ class DteExportRateSensor(_DteBaseRateSensor):
         period = self._active_period()
         if period is not None:
             attrs[ATTR_EXPORT_RATE_SOURCE] = self._export_rate_source(period)
-            attrs[ATTR_RIDER18_EXPORT_AVAILABLE] = rider18_export_formula_available(period, self._pscr_cents())
+            attrs[ATTR_RIDER18_EXPORT_AVAILABLE] = rider18_export_formula_available(period, self._pscr_cents_for_rate())
             warning = self._export_rate_warning(period)
             if warning is not None:
                 attrs[ATTR_EXPORT_RATE_WARNING] = warning
