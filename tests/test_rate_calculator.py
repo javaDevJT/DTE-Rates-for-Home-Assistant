@@ -67,11 +67,11 @@ def test_import_is_total_of_all_per_kwh_components():
     assert current_import_rate_cents(active) == Decimal("24.133")
 
 
-def test_rider18_export_without_net_metering_uses_generation_plus_distribution():
+def test_rider18_export_without_net_metering_matches_spreadsheet_generation_plus_pscr():
     rate = _rate_plan()
     active = get_active_period(rate, datetime(2026, 6, 1, 16, 30))
     assert active is not None
-    assert current_export_rate_cents(active, net_metering=False) == Decimal("24.133")
+    assert current_export_rate_cents(active, net_metering=False, pscr_cents=Decimal("1.877")) == Decimal("16.284")
 
 
 def test_rider18_export_excludes_unrelated_non_formula_components():
@@ -82,14 +82,13 @@ def test_rider18_export_excludes_unrelated_non_formula_components():
             per_kwh={
                 "capacity_energy": Decimal("1.000"),
                 "non_capacity_energy": Decimal("2.000"),
-                "distribution_kwh": Decimal("3.000"),
                 "misc_adjustment": Decimal("4.000"),
             }
         ),
         window=TimeWindow(label="all_kwh"),
     )
 
-    assert current_export_rate_cents(period, net_metering=False) == Decimal("6.000")
+    assert current_export_rate_cents(period, net_metering=False, pscr_cents=Decimal("1.877")) == Decimal("4.877")
 
 
 def test_export_with_net_metering_uses_total():

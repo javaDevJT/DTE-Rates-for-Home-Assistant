@@ -23,6 +23,7 @@ async def test_config_flow_creates_entry_with_selected_rate(monkeypatch):
                 "D1.13": RatePlan(code="D1.13", name="Overnight", periods=[]),
             },
             raw_text_hash="abc",
+            pscr_cents=None,
         )
 
     monkeypatch.setattr(
@@ -69,5 +70,5 @@ async def test_config_flow_describes_rider18_formula_status(monkeypatch):
     assert result["type"] == "form"
     assert (
         result["description_placeholders"]["rider18_status"]
-        == "Rider 18 export credits are calculated from the parsed rate card as Generation + Distribution/Transmission."
+        == "Rider 18 export credits use parsed generation rates plus PSCR when the PSCR value is available."
     )

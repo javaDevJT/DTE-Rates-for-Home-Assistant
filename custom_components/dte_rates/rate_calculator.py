@@ -7,7 +7,6 @@ from .models import RatePlan, SeasonalPeriodRate
 
 
 GENERATION_COMPONENT_MARKERS = ("capacity_energy", "non_capacity_energy")
-DISTRIBUTION_TRANSMISSION_COMPONENT_MARKERS = ("distribution", "transmission")
 
 
 def _is_hour_in_range(start_hour: int, end_hour: int, hour: int) -> bool:
@@ -78,25 +77,23 @@ def _has_component(period: SeasonalPeriodRate, markers: tuple[str, ...]) -> bool
     return any(any(marker in key for marker in markers) for key in period.components.per_kwh)
 
 
-def rider18_export_rate_cents(period: SeasonalPeriodRate) -> Decimal:
-    return _component_total(period, GENERATION_COMPONENT_MARKERS) + _component_total(
-        period,
-        DISTRIBUTION_TRANSMISSION_COMPONENT_MARKERS,
-    )
+def rider18_export_rate_cents(period: SeasonalPeriodRate, pscr_cents: Decimal | None = None) -> Decimal:
+    return _component_total(period, GENERATION_COMPONENT_MARKERS) + (pscr_cents or Decimal("0"))
 
 
-def rider18_export_formula_available(period: SeasonalPeriodRate) -> bool:
-    return _has_component(period, GENERATION_COMPONENT_MARKERS) and _has_component(
-        period,
-        DISTRIBUTION_TRANSMISSION_COMPONENT_MARKERS,
-    )
+def rider18_export_formula_available(period: SeasonalPeriodRate, pscr_cents: Decimal | None = None) -> bool:
+    return _has_component(period, GENERATION_COMPONENT_MARKERS) and pscr_cents is not None
 
 
-def current_export_rate_cents(period: SeasonalPeriodRate, net_metering: bool) -> Decimal:
+def current_export_rate_cents(
+    period: SeasonalPeriodRate,
+    net_metering: bool,
+    pscr_cents: Decimal | None = None,
+) -> Decimal:
     if net_metering:
         return period.components.per_kwh_total
 
-    return rider18_export_rate_cents(period)
+    return rider18_export_rate_cents(period, pscr_cents)
 
 
 def period_display_name(period: SeasonalPeriodRate) -> str:

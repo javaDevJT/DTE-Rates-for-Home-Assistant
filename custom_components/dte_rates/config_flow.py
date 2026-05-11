@@ -45,4 +45,4 @@ class DteRatesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 def _rider18_status(_rate_card) -> str:
-    return "Rider 18 export credits are calculated from the parsed rate card as Generation + Distribution/Transmission."
+    return "Rider 18 export credits use parsed generation rates plus PSCR when the PSCR value is available."
