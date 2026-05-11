@@ -74,6 +74,13 @@ def test_export_without_net_metering_only_generation():
     assert current_export_rate_cents(active, net_metering=False) == Decimal("14.407")
 
 
+def test_export_without_net_metering_prefers_rider18_credit():
+    rate = _rate_plan()
+    active = get_active_period(rate, datetime(2026, 6, 1, 16, 30))
+    assert active is not None
+    assert current_export_rate_cents(active, net_metering=False, rider18_export_cents=Decimal("16.284")) == Decimal("16.284")
+
+
 def test_export_with_net_metering_uses_total():
     rate = _rate_plan()
     active = get_active_period(rate, datetime(2026, 6, 1, 16, 30))

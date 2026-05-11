@@ -17,7 +17,9 @@ from custom_components.dte_rates.sensor import (
 )
 
 
-def _coordinator_with_rate() -> SimpleNamespace:
+def _coordinator_with_rate(
+    rider18_export_rates: dict[tuple[str, str], Decimal] | None = None,
+) -> SimpleNamespace:
     rate = RatePlan(
         code="D1.11",
         name="Standard Base",
@@ -42,6 +44,8 @@ def _coordinator_with_rate() -> SimpleNamespace:
             effective_date="February 6, 2025",
             rates={"D1.11": rate},
             raw_text_hash="hash",
+            rider18_source_url="https://example.test/Rider18Calculator.xlsx" if rider18_export_rates else None,
+            rider18_export_rates={"D1.11": rider18_export_rates or {}},
         )
     )
 
@@ -69,6 +73,27 @@ def test_export_sensor_uses_generation_only_without_net_metering(monkeypatch):
     sensor = DteExportRateSensor(coordinator, entry)
     assert sensor.native_value == 0.03
     assert sensor.extra_state_attributes["next_rate_value"] is None
+
+
+def test_export_sensor_prefers_rider18_credit_without_net_metering(monkeypatch):
+    monkeypatch.setattr("custom_components.dte_rates.sensor.dt_util.now", lambda: datetime(2026, 3, 1, 12, 0))
+
+    coordinator = _coordinator_with_rate({("year_round", "all_kwh"): Decimal("10.586")})
+    entry = SimpleNamespace(entry_id="entry_13", data={CONF_SELECTED_RATE: "D1.11", CONF_NET_METERING: False})
+
+    sensor = DteExportRateSensor(coordinator, entry)
+    assert sensor.native_value == 0.10586
+    assert sensor.extra_state_attributes["rider18_source_url"] == "https://example.test/Rider18Calculator.xlsx"
+
+
+def test_export_sensor_ignores_rider18_credit_with_net_metering(monkeypatch):
+    monkeypatch.setattr("custom_components.dte_rates.sensor.dt_util.now", lambda: datetime(2026, 3, 1, 12, 0))
+
+    coordinator = _coordinator_with_rate({("year_round", "all_kwh"): Decimal("10.586")})
+    entry = SimpleNamespace(entry_id="entry_14", data={CONF_SELECTED_RATE: "D1.11", CONF_NET_METERING: True})
+
+    sensor = DteExportRateSensor(coordinator, entry)
+    assert sensor.native_value == 0.06
 
 
 def test_sensor_warns_when_selected_rate_disappears(monkeypatch):
@@ -132,6 +157,18 @@ def test_schedule_sensor_exposes_full_schedule(monkeypatch):
     assert "Export $0.0300/kWh" in attrs["schedule_text"]
     assert attrs["schedule_by_season"][0]["export_usd_per_kwh"] == 0.03
     assert attrs["next_rate_value"] is None
+
+
+def test_schedule_sensor_uses_rider18_export_credit(monkeypatch):
+    monkeypatch.setattr("custom_components.dte_rates.sensor.dt_util.now", lambda: datetime(2026, 3, 1, 12, 0))
+    coordinator = _coordinator_with_rate({("year_round", "all_kwh"): Decimal("10.586")})
+    entry = SimpleNamespace(entry_id="entry_15", data={CONF_SELECTED_RATE: "D1.11", CONF_NET_METERING: False})
+
+    sensor = DteRateScheduleSensor(coordinator, entry)
+    attrs = sensor.extra_state_attributes
+
+    assert "Export $0.1059/kWh" in attrs["schedule_text"]
+    assert attrs["schedule_by_season"][0]["export_usd_per_kwh"] == 0.10586
 
 
 def test_schedule_sensor_next_rate_value_defaults_to_import(monkeypatch):

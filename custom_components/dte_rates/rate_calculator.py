@@ -65,9 +65,16 @@ def current_import_rate_cents(period: SeasonalPeriodRate) -> Decimal:
     return period.components.per_kwh_total
 
 
-def current_export_rate_cents(period: SeasonalPeriodRate, net_metering: bool) -> Decimal:
+def current_export_rate_cents(
+    period: SeasonalPeriodRate,
+    net_metering: bool,
+    rider18_export_cents: Decimal | None = None,
+) -> Decimal:
     if net_metering:
         return period.components.per_kwh_total
+
+    if rider18_export_cents is not None:
+        return rider18_export_cents
 
     generation_only = Decimal("0")
     for key, value in period.components.per_kwh.items():
