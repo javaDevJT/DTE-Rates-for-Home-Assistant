@@ -20,11 +20,14 @@ from .const import (
     ATTR_MONTHLY_COMPONENTS,
     ATTR_PERIOD,
     ATTR_CURRENT_RATE_NAME,
+    ATTR_EXPORT_RATE_SOURCE,
+    ATTR_EXPORT_RATE_WARNING,
     ATTR_NEXT_RATE_CHANGE,
     ATTR_NEXT_RATE_NAME,
     ATTR_NEXT_RATE_VALUE,
     ATTR_RATE_CODE,
     ATTR_RATE_NAME,
+    ATTR_RIDER18_EXPORT_AVAILABLE,
     ATTR_RIDER18_SOURCE_URL,
     ATTR_SCHEDULE_BY_SEASON,
     ATTR_SCHEDULE_TEXT,
@@ -121,6 +124,25 @@ class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
             period,
             self._entry.data.get(CONF_NET_METERING, False),
             self._rider18_export_rate_cents(period),
+        )
+
+    def _export_rate_source(self, period: SeasonalPeriodRate) -> str:
+        if self._entry.data.get(CONF_NET_METERING, False):
+            return "net_metering"
+        if self._rider18_export_rate_cents(period) is not None:
+            return "rider18"
+        return "pdf_generation_components"
+
+    def _export_rate_warning(self, period: SeasonalPeriodRate) -> str | None:
+        if self._entry.data.get(CONF_NET_METERING, False):
+            return None
+        if self._rider18_export_rate_cents(period) is not None:
+            return None
+        if not self.coordinator.data.rider18_source_url:
+            return "Rider 18 export credits are not loaded; using PDF generation-only export pricing."
+        return (
+            "No Rider 18 export credit matched the selected rate's active season and period; "
+            "using PDF generation-only export pricing."
         )
 
     def _warning(self) -> str | None:
@@ -282,6 +304,13 @@ class DteExportRateSensor(_DteBaseRateSensor):
     def extra_state_attributes(self) -> dict:
         attrs = self._base_attributes()
         attrs[CONF_NET_METERING] = self._entry.data.get(CONF_NET_METERING, False)
+        period = self._active_period()
+        if period is not None:
+            attrs[ATTR_EXPORT_RATE_SOURCE] = self._export_rate_source(period)
+            attrs[ATTR_RIDER18_EXPORT_AVAILABLE] = self._rider18_export_rate_cents(period) is not None
+            warning = self._export_rate_warning(period)
+            if warning is not None:
+                attrs[ATTR_EXPORT_RATE_WARNING] = warning
         return attrs
 
     def _period_value_usd(self, period: SeasonalPeriodRate | None) -> float | None:

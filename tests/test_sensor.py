@@ -84,6 +84,8 @@ def test_export_sensor_prefers_rider18_credit_without_net_metering(monkeypatch):
     sensor = DteExportRateSensor(coordinator, entry)
     assert sensor.native_value == 0.10586
     assert sensor.extra_state_attributes["rider18_source_url"] == "https://example.test/Rider18Calculator.xlsx"
+    assert sensor.extra_state_attributes["export_rate_source"] == "rider18"
+    assert sensor.extra_state_attributes["rider18_export_available"] is True
 
 
 def test_export_sensor_ignores_rider18_credit_with_net_metering(monkeypatch):
@@ -94,6 +96,22 @@ def test_export_sensor_ignores_rider18_credit_with_net_metering(monkeypatch):
 
     sensor = DteExportRateSensor(coordinator, entry)
     assert sensor.native_value == 0.06
+    assert sensor.extra_state_attributes["export_rate_source"] == "net_metering"
+
+
+def test_export_sensor_reports_generation_fallback_when_rider18_missing(monkeypatch):
+    monkeypatch.setattr("custom_components.dte_rates.sensor.dt_util.now", lambda: datetime(2026, 3, 1, 12, 0))
+
+    coordinator = _coordinator_with_rate({("june_through_september", "peak"): Decimal("16.284")})
+    entry = SimpleNamespace(entry_id="entry_16", data={CONF_SELECTED_RATE: "D1.11", CONF_NET_METERING: False})
+
+    sensor = DteExportRateSensor(coordinator, entry)
+    attrs = sensor.extra_state_attributes
+
+    assert sensor.native_value == 0.03
+    assert attrs["export_rate_source"] == "pdf_generation_components"
+    assert attrs["rider18_export_available"] is False
+    assert "No Rider 18 export credit" in attrs["export_rate_warning"]
 
 
 def test_sensor_warns_when_selected_rate_disappears(monkeypatch):

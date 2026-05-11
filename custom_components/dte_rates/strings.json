@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "DTE Residential Rates",
-        "description": "Choose your DTE residential electric pricing plan.",
+        "description": "Choose your DTE residential electric pricing plan.\n\n{rider18_status}",
         "data": {
           "selected_rate": "Rate plan",
           "net_metering": "Net metering enabled"
