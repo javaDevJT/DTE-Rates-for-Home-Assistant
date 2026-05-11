@@ -122,13 +122,9 @@ def _make_show_schedule_handler(hass: HomeAssistant):
 
         lines_by_season: dict[str, list[str]] = defaultdict(list)
         net_metering = entry.data.get(CONF_NET_METERING, False) if entry else False
-        rider18_rates = getattr(coordinator.data, "rider18_export_rates", {})
         for period in sorted(rate.periods, key=lambda p: (p.season_name, p.period_name)):
             import_usd = float(current_import_rate_cents(period) / 100)
-            rider18_export_cents = None
-            if not net_metering:
-                rider18_export_cents = rider18_rates.get(rate.code, {}).get((period.season_name, period.period_name))
-            export_usd = float(current_export_rate_cents(period, net_metering, rider18_export_cents) / 100)
+            export_usd = float(current_export_rate_cents(period, net_metering) / 100)
             lines_by_season[period.season_name].append(
                 f"{period_display_name(period)}: Import ${import_usd:.4f}/kWh | Export ${export_usd:.4f}/kWh"
             )

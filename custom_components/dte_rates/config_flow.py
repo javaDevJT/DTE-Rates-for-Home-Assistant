@@ -6,7 +6,6 @@ from homeassistant.data_entry_flow import FlowResult
 
 from .const import CONF_NET_METERING, CONF_SELECTED_RATE, DOMAIN
 from .coordinator import DteRateCoordinator
-from .models import ParsedRateCard
 
 
 class DteRatesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -45,13 +44,5 @@ class DteRatesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
 
-def _rider18_status(rate_card: ParsedRateCard) -> str:
-    count = len(rate_card.rider18_export_rates)
-    if count:
-        suffix = "rate plan" if count == 1 else "rate plans"
-        return f"Rider 18 export credits loaded for {count} {suffix}."
-
-    if rate_card.rider18_source_url:
-        return "Rider 18 calculator loaded, but no export credits matched the parsed rate plans."
-
-    return "Rider 18 export credits are not loaded; non-net-metering exports will fall back to PDF generation-only pricing."
+def _rider18_status(_rate_card) -> str:
+    return "Rider 18 export credits are calculated from the parsed rate card as Generation + Distribution/Transmission."

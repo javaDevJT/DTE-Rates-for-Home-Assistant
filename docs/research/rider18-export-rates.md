@@ -2,28 +2,27 @@
 
 ## Source
 
-- Enhancement request: use DTE Rider 18 calculator rates for export calculations.
-- Workbook URL: `https://www.dteenergy.com/content/dam/dteenergy/deg/website/hybris/rooftop-solar/Rider18Calculator.xlsx`
-
-## Workbook Findings
-
-The workbook has a `Rates and Credits` sheet with Rider 18 credit values. The relevant table is labeled `FULL SERVICE - Rider 18 Credits`.
-
-Parser validation on May 11, 2026 downloaded the workbook successfully and extracted D1.11 Rider 18 outflow credits from that sheet.
-
-Observed D1.11 rows:
-
-| Workbook label | Integration season | Integration period | Outflow credit incl. PSCR |
-| --- | --- | --- | --- |
-| `June-Sept On Peak` | `june_through_september` | `peak` | `$0.16284/kWh` |
-| `June-Sept Off Peak` | `june_through_september` | `off_peak` | `$0.10586/kWh` |
-| `Oct-May On Peak` | `october_through_may` | `peak` | `$0.12196/kWh` |
-| `Oct-May Off Peak` | `october_through_may` | `off_peak` | `$0.10586/kWh` |
-
-The workbook stores credits as negative dollars per kWh. The integration converts them to positive cents per kWh internally so they flow through the same calculator path as PDF-derived rates.
+- Enhancement request: calculate Rider 18 export credits from the rate card.
+- User-provided formula reference: `Total per-kWh Credit = Generation Rate + Distribution/Transmission Rate`.
 
 ## Implementation Decision
 
-For non-net-metering export calculations, prefer the workbook `Outflow Cred. Incl. PSCR` column when a matching rate, season, and period exists. If Rider 18 data is unavailable or does not contain a matching period, fall back to the PDF generation-only calculation.
+Do not use the Rider 18 calculator workbook for export pricing. The integration now derives non-net-metering Rider 18 export credits directly from the parsed residential rate card.
+
+Formula:
+
+```text
+Rider 18 export credit = generation components + distribution/transmission components
+```
+
+The parsed rate card currently identifies generation components by keys containing `capacity_energy` or `non_capacity_energy`. It identifies distribution/transmission components by keys containing `distribution` or `transmission`.
 
 For net metering, keep the existing behavior: export uses the full active import rate from the selected rate plan.
+
+## UI/Entity Status
+
+The setup flow explains that Rider 18 export credits are calculated from the parsed rate card formula. Export entities expose whether the active period has enough parsed components for the full formula:
+
+- `export_rate_source: rider18_formula` when generation and distribution/transmission components are present.
+- `export_rate_source: rider18_formula_incomplete` when one side of the formula is missing.
+- `export_rate_source: net_metering` when net metering is enabled.

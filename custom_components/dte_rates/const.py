@@ -6,10 +6,6 @@ RATE_CARD_URL = (
     "residential/Service-Request/pricing/residential-pricing-options/"
     "ResidentialElectricRateCard.pdf"
 )
-RIDER18_CALCULATOR_URL = (
-    "https://www.dteenergy.com/content/dam/dteenergy/deg/website/"
-    "hybris/rooftop-solar/Rider18Calculator.xlsx"
-)
 
 UPDATE_INTERVAL = timedelta(days=7)
 
@@ -23,7 +19,6 @@ ATTR_PERIOD = "period"
 ATTR_COMPONENTS = "components"
 ATTR_MONTHLY_COMPONENTS = "monthly_components"
 ATTR_SOURCE_URL = "source_url"
-ATTR_RIDER18_SOURCE_URL = "rider18_source_url"
 ATTR_RIDER18_EXPORT_AVAILABLE = "rider18_export_available"
 ATTR_EXPORT_RATE_SOURCE = "export_rate_source"
 ATTR_EXPORT_RATE_WARNING = "export_rate_warning"

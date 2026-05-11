@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from decimal import Decimal
-
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
@@ -28,7 +26,6 @@ from .const import (
     ATTR_RATE_CODE,
     ATTR_RATE_NAME,
     ATTR_RIDER18_EXPORT_AVAILABLE,
-    ATTR_RIDER18_SOURCE_URL,
     ATTR_SCHEDULE_BY_SEASON,
     ATTR_SCHEDULE_TEXT,
     ATTR_SEASON,
@@ -46,6 +43,7 @@ from .rate_calculator import (
     get_active_period,
     get_next_rate_change,
     period_display_name,
+    rider18_export_formula_available,
 )
 
 
@@ -108,41 +106,24 @@ class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
             return None
         return get_active_period(rate, dt_util.now())
 
-    def _rider18_export_rate_cents(self, period: SeasonalPeriodRate) -> Decimal | None:
-        if self._entry.data.get(CONF_NET_METERING, False):
-            return None
-
-        rate = self._selected_rate()
-        if rate is None:
-            return None
-
-        rider18_rates = getattr(self.coordinator.data, "rider18_export_rates", {})
-        return rider18_rates.get(rate.code, {}).get((period.season_name, period.period_name))
-
     def _export_rate_cents(self, period: SeasonalPeriodRate):
-        return current_export_rate_cents(
-            period,
-            self._entry.data.get(CONF_NET_METERING, False),
-            self._rider18_export_rate_cents(period),
-        )
+        return current_export_rate_cents(period, self._entry.data.get(CONF_NET_METERING, False))
 
     def _export_rate_source(self, period: SeasonalPeriodRate) -> str:
         if self._entry.data.get(CONF_NET_METERING, False):
             return "net_metering"
-        if self._rider18_export_rate_cents(period) is not None:
-            return "rider18"
-        return "pdf_generation_components"
+        if rider18_export_formula_available(period):
+            return "rider18_formula"
+        return "rider18_formula_incomplete"
 
     def _export_rate_warning(self, period: SeasonalPeriodRate) -> str | None:
         if self._entry.data.get(CONF_NET_METERING, False):
             return None
-        if self._rider18_export_rate_cents(period) is not None:
+        if rider18_export_formula_available(period):
             return None
-        if not self.coordinator.data.rider18_source_url:
-            return "Rider 18 export credits are not loaded; using PDF generation-only export pricing."
         return (
-            "No Rider 18 export credit matched the selected rate's active season and period; "
-            "using PDF generation-only export pricing."
+            "Rider 18 formula is missing a generation or distribution/transmission component "
+            "for the active period; using the available formula components only."
         )
 
     def _warning(self) -> str | None:
@@ -160,9 +141,6 @@ class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
             ATTR_SOURCE_URL: self.coordinator.data.source_url,
             ATTR_CARD_EFFECTIVE_DATE: self.coordinator.data.effective_date,
         }
-        if self.coordinator.data.rider18_source_url:
-            attrs[ATTR_RIDER18_SOURCE_URL] = self.coordinator.data.rider18_source_url
-
         rate = self._selected_rate()
         period = self._active_period()
         if rate is None or period is None:
@@ -307,7 +285,7 @@ class DteExportRateSensor(_DteBaseRateSensor):
         period = self._active_period()
         if period is not None:
             attrs[ATTR_EXPORT_RATE_SOURCE] = self._export_rate_source(period)
-            attrs[ATTR_RIDER18_EXPORT_AVAILABLE] = self._rider18_export_rate_cents(period) is not None
+            attrs[ATTR_RIDER18_EXPORT_AVAILABLE] = rider18_export_formula_available(period)
             warning = self._export_rate_warning(period)
             if warning is not None:
                 attrs[ATTR_EXPORT_RATE_WARNING] = warning

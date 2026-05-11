@@ -7,6 +7,7 @@ from .models import RatePlan, SeasonalPeriodRate
 
 
 GENERATION_COMPONENT_MARKERS = ("capacity_energy", "non_capacity_energy")
+DISTRIBUTION_TRANSMISSION_COMPONENT_MARKERS = ("distribution", "transmission")
 
 
 def _is_hour_in_range(start_hour: int, end_hour: int, hour: int) -> bool:
@@ -65,22 +66,37 @@ def current_import_rate_cents(period: SeasonalPeriodRate) -> Decimal:
     return period.components.per_kwh_total
 
 
-def current_export_rate_cents(
-    period: SeasonalPeriodRate,
-    net_metering: bool,
-    rider18_export_cents: Decimal | None = None,
-) -> Decimal:
+def _component_total(period: SeasonalPeriodRate, markers: tuple[str, ...]) -> Decimal:
+    total = Decimal("0")
+    for key, value in period.components.per_kwh.items():
+        if any(marker in key for marker in markers):
+            total += value
+    return total
+
+
+def _has_component(period: SeasonalPeriodRate, markers: tuple[str, ...]) -> bool:
+    return any(any(marker in key for marker in markers) for key in period.components.per_kwh)
+
+
+def rider18_export_rate_cents(period: SeasonalPeriodRate) -> Decimal:
+    return _component_total(period, GENERATION_COMPONENT_MARKERS) + _component_total(
+        period,
+        DISTRIBUTION_TRANSMISSION_COMPONENT_MARKERS,
+    )
+
+
+def rider18_export_formula_available(period: SeasonalPeriodRate) -> bool:
+    return _has_component(period, GENERATION_COMPONENT_MARKERS) and _has_component(
+        period,
+        DISTRIBUTION_TRANSMISSION_COMPONENT_MARKERS,
+    )
+
+
+def current_export_rate_cents(period: SeasonalPeriodRate, net_metering: bool) -> Decimal:
     if net_metering:
         return period.components.per_kwh_total
 
-    if rider18_export_cents is not None:
-        return rider18_export_cents
-
-    generation_only = Decimal("0")
-    for key, value in period.components.per_kwh.items():
-        if any(marker in key for marker in GENERATION_COMPONENT_MARKERS):
-            generation_only += value
-    return generation_only
+    return rider18_export_rate_cents(period)
 
 
 def period_display_name(period: SeasonalPeriodRate) -> str:

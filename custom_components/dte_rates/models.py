@@ -50,5 +50,3 @@ class ParsedRateCard:
     effective_date: str | None
     rates: dict[str, RatePlan]
     raw_text_hash: str
-    rider18_source_url: str | None = None
-    rider18_export_rates: dict[str, dict[tuple[str, str], Decimal]] = field(default_factory=dict)
