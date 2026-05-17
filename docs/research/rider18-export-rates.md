@@ -40,6 +40,8 @@ For net metering, keep the existing behavior: export uses the full active import
 
 The setup flow reports how many MPSC tariff PSCR factors were loaded. Export entities expose the selected rate's PSCR value, the PSCR source URL, and the full parsed `pscr_rates` map.
 
+The MPSC rate book can mention `C8.5 Surcharges and Credits Applicable to Power Supply Service` in the front-matter index before the real tariff table. Parser logic must scan candidate C8.5 sections until it finds tariff rows, otherwise it can stop at the index, see no PSCR rows, and incorrectly log that the rate book does not contain PSCR tariff rows.
+
 Export entities expose whether the active period has enough data for the full formula:
 
 - `export_rate_source: rider18_formula` when generation components and PSCR are present.
