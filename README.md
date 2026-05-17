@@ -56,6 +56,7 @@ During setup you choose:
 - **Net metering enabled** (checkbox).
 - **Include PSCR** (enabled by default).
 - **Tax rate (%)** (free-form, defaults to `4.0`; set to `0` to omit tax).
+- Detroit residents may incur an additional 5.0% City Utility Users' Tax; adjust the free-form tax rate if that applies to your service address.
 
 ## Entities Created
 
@@ -84,6 +85,8 @@ Core rate entities include attributes such as:
 - `include_pscr`
 - `tax_rate_percent`
 - `pscr_cents`
+- `current_rate_formula`
+- `current_rate_calculation`
 - `selected_rate_available`
 - `warning` (when selected plan disappears)
 

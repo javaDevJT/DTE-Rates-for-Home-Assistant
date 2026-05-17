@@ -134,5 +134,6 @@ def _rider18_status(rate_card) -> str:
 def _tax_note() -> str:
     return (
         "Default tax is Michigan's 4.0% residential electric sales tax. "
+        "Detroit residents may incur an additional 5.0% City Utility Users' Tax. "
         "Set tax rate to 0 to omit taxes from rate calculations."
     )

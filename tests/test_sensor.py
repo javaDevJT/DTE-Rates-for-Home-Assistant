@@ -68,6 +68,20 @@ def test_import_sensor_returns_default_out_of_pocket_rate(monkeypatch):
     assert attrs["next_rate_change"] is None
     assert attrs["include_pscr"] is True
     assert attrs["tax_rate_percent"] == 4.0
+    assert attrs["current_rate_formula"] == "((base 6.0000 + PSCR 1.8770) * (1 + tax 4.0000%)) / 100 = $0.081921/kWh"
+    assert attrs["current_rate_calculation"] == {
+        "mode": "import",
+        "base_cents_per_kwh": 6.0,
+        "pscr_cents_per_kwh": 1.877,
+        "pscr_included": True,
+        "tax_rate_percent": 4.0,
+        "tax_applied": True,
+        "pre_tax_cents_per_kwh": 7.877,
+        "tax_cents_per_kwh": 0.31508,
+        "total_cents_per_kwh": 8.19208,
+        "total_usd_per_kwh": 0.0819208,
+        "formula": "((base 6.0000 + PSCR 1.8770) * (1 + tax 4.0000%)) / 100 = $0.081921/kWh",
+    }
 
 
 def test_import_sensor_can_omit_modifiers(monkeypatch):
@@ -105,6 +119,11 @@ def test_export_sensor_uses_rider18_formula_without_net_metering(monkeypatch):
     assert sensor.extra_state_attributes["rider18_export_available"] is True
     assert sensor.extra_state_attributes["pscr_cents"] == 1.877
     assert sensor.extra_state_attributes["pscr_rate_code"] == "D1.11"
+    assert (
+        sensor.extra_state_attributes["current_rate_formula"]
+        == "(generation 3.0000 + PSCR 1.8770) / 100 = $0.048770/kWh"
+    )
+    assert sensor.extra_state_attributes["current_rate_calculation"]["tax_applied"] is False
 
 
 def test_export_sensor_ignores_rider18_credit_with_net_metering(monkeypatch):
@@ -116,6 +135,8 @@ def test_export_sensor_ignores_rider18_credit_with_net_metering(monkeypatch):
     sensor = DteExportRateSensor(coordinator, entry)
     assert sensor.native_value == pytest.approx(0.0819208)
     assert sensor.extra_state_attributes["export_rate_source"] == "net_metering"
+    assert sensor.extra_state_attributes["current_rate_calculation"]["mode"] == "net_metering_export"
+    assert "net metering export" in sensor.extra_state_attributes["current_rate_formula"]
 
 
 def test_export_sensor_reports_formula_unavailable_without_pscr(monkeypatch):

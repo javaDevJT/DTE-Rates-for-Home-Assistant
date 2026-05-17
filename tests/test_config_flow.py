@@ -85,6 +85,7 @@ async def test_config_flow_describes_rider18_formula_status(monkeypatch):
         == "Rider 18 export credits use parsed generation rates plus MPSC PSCR factors loaded for 2 tariffs."
     )
     assert "Set tax rate to 0" in result["description_placeholders"]["tax_note"]
+    assert "Detroit residents may incur an additional 5.0%" in result["description_placeholders"]["tax_note"]
 
 
 @pytest.mark.asyncio

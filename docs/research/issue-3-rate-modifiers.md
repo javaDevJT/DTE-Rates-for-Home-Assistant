@@ -17,6 +17,8 @@ The issue asks for rate modifiers so Home Assistant can show a closer out-of-poc
 - Users can disable PSCR with an `include_pscr` setting. When disabled, Rider 18 export credits intentionally use generation-only formula components and should not report a missing-PSCR warning.
 - The default tax rate is `4.0%`. Michigan Treasury describes residential electricity as taxed at a 4% rate, and MPSC residential bill-charge guidance says utility companies collect 4% sales tax from residential customers.
 - The tax rate remains free-form as `tax_rate`, labeled as a percentage. Users can enter `0` to omit taxes from rate calculations.
+- Detroit residents may incur an additional `5.0%` City Utility Users' Tax. The UI note mentions this but does not change the default, because the integration does not currently know the service address.
+- Rate entities expose `current_rate_formula` and `current_rate_calculation` attributes so users can see the PSCR/tax inputs and exact math used for the active period.
 
 ## Calculation Scope
 
@@ -28,3 +30,4 @@ The issue asks for rate modifiers so Home Assistant can show a closer out-of-poc
 
 - Michigan Treasury sales and use tax page: https://www.michigan.gov/taxes/business-taxes/sales-use-tax
 - MPSC residential electric bill charges PDF: https://www.michigan.gov/-/media/Project/Websites/mpsc/consumer/info/tips/electric_residential_bill_charges_final.pdf?rev=e80ef0b163614800b1d8910b9e781775
+- City of Detroit September 2019 Revenue Estimating Conference Report: https://detroitmi.gov/sites/detroitmi.localhost/files/migrated_docs/financial-reports/Sept2019RevenueEstimatingConferenceReportFINAL.pdf
