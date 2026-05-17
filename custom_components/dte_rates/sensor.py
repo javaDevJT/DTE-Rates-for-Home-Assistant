@@ -22,6 +22,7 @@ from .const import (
     ATTR_CURRENT_RATE_NAME,
     ATTR_EXPORT_RATE_SOURCE,
     ATTR_EXPORT_RATE_WARNING,
+    ATTR_INCLUDE_PSCR,
     ATTR_NEXT_RATE_CHANGE,
     ATTR_NEXT_RATE_NAME,
     ATTR_NEXT_RATE_VALUE,
@@ -37,6 +38,7 @@ from .const import (
     ATTR_SEASON,
     ATTR_SELECTED_RATE_AVAILABLE,
     ATTR_SOURCE_URL,
+    ATTR_TAX_RATE_PERCENT,
     ATTR_WARNING,
     CONF_NET_METERING,
     CONF_SELECTED_RATE,
@@ -51,6 +53,7 @@ from .rate_calculator import (
     period_display_name,
     rider18_export_formula_available,
 )
+from .settings import entry_include_pscr, entry_tax_rate_percent
 
 
 async def async_setup_entry(
@@ -118,24 +121,40 @@ class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
             return None
         return getattr(self.coordinator.data, "pscr_rates", {}).get(target_rate.code)
 
+    def _include_pscr(self) -> bool:
+        return entry_include_pscr(self._entry)
+
+    def _tax_rate_percent(self) -> Decimal:
+        return entry_tax_rate_percent(self._entry)
+
+    def _import_rate_cents(self, period: SeasonalPeriodRate) -> Decimal:
+        return current_import_rate_cents(
+            period,
+            self._pscr_cents_for_rate(),
+            self._include_pscr(),
+            self._tax_rate_percent(),
+        )
+
     def _export_rate_cents(self, period: SeasonalPeriodRate):
         return current_export_rate_cents(
             period,
             self._entry.data.get(CONF_NET_METERING, False),
             self._pscr_cents_for_rate(),
+            self._include_pscr(),
+            self._tax_rate_percent(),
         )
 
     def _export_rate_source(self, period: SeasonalPeriodRate) -> str:
         if self._entry.data.get(CONF_NET_METERING, False):
             return "net_metering"
-        if rider18_export_formula_available(period, self._pscr_cents_for_rate()):
+        if rider18_export_formula_available(period, self._pscr_cents_for_rate(), self._include_pscr()):
             return "rider18_formula"
         return "rider18_formula_incomplete"
 
     def _export_rate_warning(self, period: SeasonalPeriodRate) -> str | None:
         if self._entry.data.get(CONF_NET_METERING, False):
             return None
-        if rider18_export_formula_available(period, self._pscr_cents_for_rate()):
+        if rider18_export_formula_available(period, self._pscr_cents_for_rate(), self._include_pscr()):
             return None
         return (
             "Rider 18 formula is missing a generation component or PSCR value "
@@ -156,6 +175,8 @@ class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
             ATTR_WARNING: warning,
             ATTR_SOURCE_URL: self.coordinator.data.source_url,
             ATTR_CARD_EFFECTIVE_DATE: self.coordinator.data.effective_date,
+            ATTR_INCLUDE_PSCR: self._include_pscr(),
+            ATTR_TAX_RATE_PERCENT: float(self._tax_rate_percent()),
         }
         pscr_cents = self._pscr_cents_for_rate()
         if pscr_cents is not None:
@@ -222,8 +243,8 @@ class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
                     "period": period.period_name,
                     "name": period_display_name(period),
                     "time_window": self._window_summary(period),
-                    "import_usd_per_kwh": round(float(current_import_rate_cents(period) / 100), 6),
-                    "export_usd_per_kwh": round(float(self._period_value_usd(period) or 0.0), 6),
+                    "import_usd_per_kwh": round(float(self._import_rate_cents(period) / 100), 6),
+                    "export_usd_per_kwh": round(float(self._export_rate_cents(period) / 100), 6),
                 }
             )
         return rows
@@ -288,7 +309,7 @@ class DteImportRateSensor(_DteBaseRateSensor):
     def _period_value_usd(self, period: SeasonalPeriodRate | None) -> float | None:
         if period is None:
             return None
-        return float(current_import_rate_cents(period) / 100)
+        return float(self._import_rate_cents(period) / 100)
 
 
 class DteExportRateSensor(_DteBaseRateSensor):
@@ -312,7 +333,11 @@ class DteExportRateSensor(_DteBaseRateSensor):
         period = self._active_period()
         if period is not None:
             attrs[ATTR_EXPORT_RATE_SOURCE] = self._export_rate_source(period)
-            attrs[ATTR_RIDER18_EXPORT_AVAILABLE] = rider18_export_formula_available(period, self._pscr_cents_for_rate())
+            attrs[ATTR_RIDER18_EXPORT_AVAILABLE] = rider18_export_formula_available(
+                period,
+                self._pscr_cents_for_rate(),
+                self._include_pscr(),
+            )
             warning = self._export_rate_warning(period)
             if warning is not None:
                 attrs[ATTR_EXPORT_RATE_WARNING] = warning
@@ -349,7 +374,7 @@ class DteCurrentRateNameSensor(_DteBaseRateSensor):
     def _period_value_usd(self, period: SeasonalPeriodRate | None) -> float | None:
         if period is None:
             return None
-        return float(current_import_rate_cents(period) / 100)
+        return float(self._import_rate_cents(period) / 100)
 
 
 class DteRateScheduleSensor(_DteBaseRateSensor):
@@ -390,7 +415,7 @@ class DteRateScheduleSensor(_DteBaseRateSensor):
                     "period": period.period_name,
                     "name": period_display_name(period),
                     "time_window": self._window_summary(period),
-                    "import_usd_per_kwh": round(float(current_import_rate_cents(period) / 100), 6),
+                    "import_usd_per_kwh": round(float(self._import_rate_cents(period) / 100), 6),
                     "export_usd_per_kwh": round(float(self._export_rate_cents(period) / 100), 6),
                 }
             )
@@ -416,4 +441,4 @@ class DteRateScheduleSensor(_DteBaseRateSensor):
     def _period_value_usd(self, period: SeasonalPeriodRate | None) -> float | None:
         if period is None:
             return None
-        return float(current_import_rate_cents(period) / 100)
+        return float(self._import_rate_cents(period) / 100)

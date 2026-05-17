@@ -61,8 +61,16 @@ def get_active_period(rate: RatePlan, now: datetime) -> SeasonalPeriodRate | Non
     return None
 
 
-def current_import_rate_cents(period: SeasonalPeriodRate) -> Decimal:
-    return period.components.per_kwh_total
+def current_import_rate_cents(
+    period: SeasonalPeriodRate,
+    pscr_cents: Decimal | None = None,
+    include_pscr: bool = False,
+    tax_rate_percent: Decimal | None = None,
+) -> Decimal:
+    total = period.components.per_kwh_total
+    if include_pscr and pscr_cents is not None:
+        total += pscr_cents
+    return _apply_tax(total, tax_rate_percent)
 
 
 def _component_total(period: SeasonalPeriodRate, markers: tuple[str, ...]) -> Decimal:
@@ -77,23 +85,40 @@ def _has_component(period: SeasonalPeriodRate, markers: tuple[str, ...]) -> bool
     return any(any(marker in key for marker in markers) for key in period.components.per_kwh)
 
 
-def rider18_export_rate_cents(period: SeasonalPeriodRate, pscr_cents: Decimal | None = None) -> Decimal:
-    return _component_total(period, GENERATION_COMPONENT_MARKERS) + (pscr_cents or Decimal("0"))
+def rider18_export_rate_cents(
+    period: SeasonalPeriodRate,
+    pscr_cents: Decimal | None = None,
+    include_pscr: bool = True,
+) -> Decimal:
+    pscr = pscr_cents if include_pscr and pscr_cents is not None else Decimal("0")
+    return _component_total(period, GENERATION_COMPONENT_MARKERS) + pscr
 
 
-def rider18_export_formula_available(period: SeasonalPeriodRate, pscr_cents: Decimal | None = None) -> bool:
-    return _has_component(period, GENERATION_COMPONENT_MARKERS) and pscr_cents is not None
+def rider18_export_formula_available(
+    period: SeasonalPeriodRate,
+    pscr_cents: Decimal | None = None,
+    include_pscr: bool = True,
+) -> bool:
+    return _has_component(period, GENERATION_COMPONENT_MARKERS) and (not include_pscr or pscr_cents is not None)
 
 
 def current_export_rate_cents(
     period: SeasonalPeriodRate,
     net_metering: bool,
     pscr_cents: Decimal | None = None,
+    include_pscr: bool = True,
+    tax_rate_percent: Decimal | None = None,
 ) -> Decimal:
     if net_metering:
-        return period.components.per_kwh_total
+        return current_import_rate_cents(period, pscr_cents, include_pscr, tax_rate_percent)
 
-    return rider18_export_rate_cents(period, pscr_cents)
+    return rider18_export_rate_cents(period, pscr_cents, include_pscr)
+
+
+def _apply_tax(value: Decimal, tax_rate_percent: Decimal | None) -> Decimal:
+    if tax_rate_percent is None:
+        return value
+    return value * (Decimal("1") + tax_rate_percent / Decimal("100"))
 
 
 def period_display_name(period: SeasonalPeriodRate) -> str:

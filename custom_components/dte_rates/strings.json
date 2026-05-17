@@ -3,12 +3,32 @@
     "step": {
       "user": {
         "title": "DTE Residential Rates",
-        "description": "Choose your DTE residential electric pricing plan.\n\n{rider18_status}",
+        "description": "Choose your DTE residential electric pricing plan.\n\n{rider18_status}\n\n{tax_note}",
         "data": {
           "selected_rate": "Rate plan",
-          "net_metering": "Net metering enabled"
+          "net_metering": "Net metering enabled",
+          "include_pscr": "Include PSCR",
+          "tax_rate": "Tax rate (%)"
         }
       }
+    },
+    "error": {
+      "invalid_tax_rate": "Tax rate must be a non-negative percentage."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "DTE Residential Rate Modifiers",
+        "description": "{tax_note}",
+        "data": {
+          "include_pscr": "Include PSCR",
+          "tax_rate": "Tax rate (%)"
+        }
+      }
+    },
+    "error": {
+      "invalid_tax_rate": "Tax rate must be a non-negative percentage."
     }
   },
   "services": {

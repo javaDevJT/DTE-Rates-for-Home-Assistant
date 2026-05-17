@@ -10,7 +10,7 @@ A Home Assistant custom integration that pulls the official DTE residential elec
 
 - Downloads the live DTE Residential Electric Rate Card PDF.
 - Parses plans, periods, windows, and component pricing dynamically.
-- Updates on a weekly schedule.
+- Updates daily so current-month PSCR changes are picked up promptly.
 - Exposes entities for:
   - Current import rate (`USD/kWh`)
   - Current export rate (`USD/kWh`)
@@ -25,6 +25,7 @@ A Home Assistant custom integration that pulls the official DTE residential elec
 - Home Assistant with support for custom integrations.
 - Internet access from Home Assistant to:
   - `dteenergy.com` (rate card PDF)
+  - `michigan.gov` (MPSC electric rate book PSCR data)
 
 ## Installation
 
@@ -53,6 +54,8 @@ During setup you choose:
 
 - **Rate plan** from the currently parsed DTE PDF.
 - **Net metering enabled** (checkbox).
+- **Include PSCR** (enabled by default).
+- **Tax rate (%)** (free-form, defaults to `4.0`; set to `0` to omit tax).
 
 ## Entities Created
 
@@ -78,6 +81,9 @@ Core rate entities include attributes such as:
 - `components`
 - `monthly_components`
 - `card_effective_date`
+- `include_pscr`
+- `tax_rate_percent`
+- `pscr_cents`
 - `selected_rate_available`
 - `warning` (when selected plan disappears)
 
@@ -140,8 +146,9 @@ Use `DTE Import Rate` as your current electricity price entity (`USD/kWh`) where
 
 ## Notes on Pricing Logic
 
-- Import is full per-kWh total for the active period.
-- Export is generation-only unless net metering is enabled.
+- Import is full per-kWh total for the active period, plus PSCR when enabled, then the configured tax percentage.
+- Rider 18 export is generation plus PSCR when enabled. Tax is not added to Rider 18 export credits.
+- Export uses the modified import rate when net metering is enabled.
 - Next-rate calculations are schedule-aware and aligned to time boundaries.
 
 ## Project Layout

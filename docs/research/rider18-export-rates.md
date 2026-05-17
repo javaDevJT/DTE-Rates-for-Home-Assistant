@@ -45,3 +45,5 @@ Export entities expose whether the active period has enough data for the full fo
 - `export_rate_source: rider18_formula` when generation components and PSCR are present.
 - `export_rate_source: rider18_formula_incomplete` when one side of the formula is missing.
 - `export_rate_source: net_metering` when net metering is enabled.
+
+Issue 3 added an `include_pscr` setting. When PSCR is intentionally disabled, the Rider 18 formula uses generation components only and does not treat the omitted PSCR add-on as an incomplete parse.

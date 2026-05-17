@@ -5,8 +5,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from custom_components.dte_rates.config_flow import DteRatesConfigFlow
-from custom_components.dte_rates.const import CONF_NET_METERING, CONF_SELECTED_RATE
+from custom_components.dte_rates.config_flow import DteRatesConfigFlow, DteRatesOptionsFlow
+from custom_components.dte_rates.const import (
+    CONF_INCLUDE_PSCR,
+    CONF_NET_METERING,
+    CONF_SELECTED_RATE,
+    CONF_TAX_RATE,
+)
 from custom_components.dte_rates.models import ParsedRateCard, RatePlan
 
 
@@ -43,6 +48,8 @@ async def test_config_flow_creates_entry_with_selected_rate(monkeypatch):
     assert result["title"] == "Overnight (D1.13)"
     assert result["data"][CONF_SELECTED_RATE] == "D1.13"
     assert result["data"][CONF_NET_METERING] is True
+    assert result["data"][CONF_INCLUDE_PSCR] is True
+    assert result["data"][CONF_TAX_RATE] == "4.0"
 
 
 @pytest.mark.asyncio
@@ -77,3 +84,28 @@ async def test_config_flow_describes_rider18_formula_status(monkeypatch):
         result["description_placeholders"]["rider18_status"]
         == "Rider 18 export credits use parsed generation rates plus MPSC PSCR factors loaded for 2 tariffs."
     )
+    assert "Set tax rate to 0" in result["description_placeholders"]["tax_note"]
+
+
+@pytest.mark.asyncio
+async def test_options_flow_updates_modifiers():
+    config_entry = MagicMock()
+    config_entry.data = {
+        CONF_SELECTED_RATE: "D1.11",
+        CONF_NET_METERING: False,
+        CONF_INCLUDE_PSCR: True,
+        CONF_TAX_RATE: "4.0",
+    }
+    config_entry.options = {}
+    flow = DteRatesOptionsFlow(config_entry)
+
+    result = await flow.async_step_init(
+        {
+            CONF_INCLUDE_PSCR: False,
+            CONF_TAX_RATE: "0",
+        }
+    )
+
+    assert result["type"] == "create_entry"
+    assert result["data"][CONF_INCLUDE_PSCR] is False
+    assert result["data"][CONF_TAX_RATE] == "0"
