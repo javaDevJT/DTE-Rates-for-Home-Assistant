@@ -19,9 +19,12 @@ from .const import (
     ATTR_COMPONENTS,
     ATTR_MONTHLY_COMPONENTS,
     ATTR_PERIOD,
+    ATTR_CURRENT_RATE_CALCULATION,
+    ATTR_CURRENT_RATE_FORMULA,
     ATTR_CURRENT_RATE_NAME,
     ATTR_EXPORT_RATE_SOURCE,
     ATTR_EXPORT_RATE_WARNING,
+    ATTR_INCLUDE_PSCR,
     ATTR_NEXT_RATE_CHANGE,
     ATTR_NEXT_RATE_NAME,
     ATTR_NEXT_RATE_VALUE,
@@ -37,6 +40,7 @@ from .const import (
     ATTR_SEASON,
     ATTR_SELECTED_RATE_AVAILABLE,
     ATTR_SOURCE_URL,
+    ATTR_TAX_RATE_PERCENT,
     ATTR_WARNING,
     CONF_NET_METERING,
     CONF_SELECTED_RATE,
@@ -44,6 +48,7 @@ from .const import (
 )
 from .models import RatePlan, SeasonalPeriodRate
 from .rate_calculator import (
+    GENERATION_COMPONENT_MARKERS,
     current_export_rate_cents,
     current_import_rate_cents,
     get_active_period,
@@ -51,6 +56,7 @@ from .rate_calculator import (
     period_display_name,
     rider18_export_formula_available,
 )
+from .settings import entry_include_pscr, entry_tax_rate_percent
 
 
 async def async_setup_entry(
@@ -118,29 +124,119 @@ class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
             return None
         return getattr(self.coordinator.data, "pscr_rates", {}).get(target_rate.code)
 
+    def _include_pscr(self) -> bool:
+        return entry_include_pscr(self._entry)
+
+    def _tax_rate_percent(self) -> Decimal:
+        return entry_tax_rate_percent(self._entry)
+
+    def _import_rate_cents(self, period: SeasonalPeriodRate) -> Decimal:
+        return current_import_rate_cents(
+            period,
+            self._pscr_cents_for_rate(),
+            self._include_pscr(),
+            self._tax_rate_percent(),
+        )
+
     def _export_rate_cents(self, period: SeasonalPeriodRate):
         return current_export_rate_cents(
             period,
             self._entry.data.get(CONF_NET_METERING, False),
             self._pscr_cents_for_rate(),
+            self._include_pscr(),
+            self._tax_rate_percent(),
         )
 
     def _export_rate_source(self, period: SeasonalPeriodRate) -> str:
         if self._entry.data.get(CONF_NET_METERING, False):
             return "net_metering"
-        if rider18_export_formula_available(period, self._pscr_cents_for_rate()):
+        if rider18_export_formula_available(period, self._pscr_cents_for_rate(), self._include_pscr()):
             return "rider18_formula"
         return "rider18_formula_incomplete"
 
     def _export_rate_warning(self, period: SeasonalPeriodRate) -> str | None:
         if self._entry.data.get(CONF_NET_METERING, False):
             return None
-        if rider18_export_formula_available(period, self._pscr_cents_for_rate()):
+        if rider18_export_formula_available(period, self._pscr_cents_for_rate(), self._include_pscr()):
             return None
         return (
             "Rider 18 formula is missing a generation component or PSCR value "
             "for the active period; using the available formula components only."
         )
+
+    def _import_rate_calculation(self, period: SeasonalPeriodRate, mode: str = "import") -> dict:
+        base = period.components.per_kwh_total
+        pscr = self._pscr_cents_for_rate()
+        pscr_applied = pscr if self._include_pscr() and pscr is not None else Decimal("0")
+        pre_tax = base + pscr_applied
+        tax_rate = self._tax_rate_percent()
+        tax = pre_tax * tax_rate / Decimal("100")
+        total = pre_tax + tax
+
+        formula = (
+            f"((base {self._fmt(base)} + PSCR {self._fmt(pscr_applied)}) "
+            f"* (1 + tax {self._fmt(tax_rate)}%)) / 100 = ${self._fmt_usd(total)}/kWh"
+        )
+        if mode == "net_metering_export":
+            formula = f"net metering export uses modified import rate: {formula}"
+
+        return {
+            "mode": mode,
+            "base_cents_per_kwh": self._as_float(base),
+            "pscr_cents_per_kwh": self._as_float(pscr),
+            "pscr_included": self._include_pscr() and pscr is not None,
+            "tax_rate_percent": self._as_float(tax_rate),
+            "tax_applied": tax_rate != 0,
+            "pre_tax_cents_per_kwh": self._as_float(pre_tax),
+            "tax_cents_per_kwh": self._as_float(tax),
+            "total_cents_per_kwh": self._as_float(total),
+            "total_usd_per_kwh": self._as_float(total / Decimal("100")),
+            "formula": formula,
+        }
+
+    def _export_rate_calculation(self, period: SeasonalPeriodRate) -> dict:
+        if self._entry.data.get(CONF_NET_METERING, False):
+            return self._import_rate_calculation(period, "net_metering_export")
+
+        generation = sum(
+            value
+            for key, value in period.components.per_kwh.items()
+            if any(marker in key for marker in GENERATION_COMPONENT_MARKERS)
+        )
+        pscr = self._pscr_cents_for_rate()
+        pscr_applied = pscr if self._include_pscr() and pscr is not None else Decimal("0")
+        total = generation + pscr_applied
+        formula = (
+            f"(generation {self._fmt(generation)} + PSCR {self._fmt(pscr_applied)}) "
+            f"/ 100 = ${self._fmt_usd(total)}/kWh"
+        )
+
+        return {
+            "mode": "rider18_export",
+            "generation_cents_per_kwh": self._as_float(generation),
+            "pscr_cents_per_kwh": self._as_float(pscr),
+            "pscr_included": self._include_pscr() and pscr is not None,
+            "tax_rate_percent": self._as_float(self._tax_rate_percent()),
+            "tax_applied": False,
+            "total_cents_per_kwh": self._as_float(total),
+            "total_usd_per_kwh": self._as_float(total / Decimal("100")),
+            "formula": formula,
+        }
+
+    def _period_calculation(self, period: SeasonalPeriodRate) -> dict:
+        return self._import_rate_calculation(period)
+
+    @staticmethod
+    def _as_float(value: Decimal | None) -> float | None:
+        return float(value) if value is not None else None
+
+    @staticmethod
+    def _fmt(value: Decimal) -> str:
+        return f"{value:.4f}"
+
+    @staticmethod
+    def _fmt_usd(cents: Decimal) -> str:
+        return f"{(cents / Decimal('100')):.6f}"
 
     def _warning(self) -> str | None:
         selected = self._entry.data[CONF_SELECTED_RATE]
@@ -156,6 +252,8 @@ class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
             ATTR_WARNING: warning,
             ATTR_SOURCE_URL: self.coordinator.data.source_url,
             ATTR_CARD_EFFECTIVE_DATE: self.coordinator.data.effective_date,
+            ATTR_INCLUDE_PSCR: self._include_pscr(),
+            ATTR_TAX_RATE_PERCENT: float(self._tax_rate_percent()),
         }
         pscr_cents = self._pscr_cents_for_rate()
         if pscr_cents is not None:
@@ -191,6 +289,9 @@ class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
                 ATTR_MONTHLY_COMPONENTS: {k: float(v) for k, v in period.components.monthly.items()},
             }
         )
+        calculation = self._period_calculation(period)
+        attrs[ATTR_CURRENT_RATE_CALCULATION] = calculation
+        attrs[ATTR_CURRENT_RATE_FORMULA] = calculation["formula"]
         return attrs
 
     def _period_value_usd(self, period: SeasonalPeriodRate | None) -> float | None:
@@ -222,8 +323,8 @@ class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
                     "period": period.period_name,
                     "name": period_display_name(period),
                     "time_window": self._window_summary(period),
-                    "import_usd_per_kwh": round(float(current_import_rate_cents(period) / 100), 6),
-                    "export_usd_per_kwh": round(float(self._period_value_usd(period) or 0.0), 6),
+                    "import_usd_per_kwh": round(float(self._import_rate_cents(period) / 100), 6),
+                    "export_usd_per_kwh": round(float(self._export_rate_cents(period) / 100), 6),
                 }
             )
         return rows
@@ -288,7 +389,7 @@ class DteImportRateSensor(_DteBaseRateSensor):
     def _period_value_usd(self, period: SeasonalPeriodRate | None) -> float | None:
         if period is None:
             return None
-        return float(current_import_rate_cents(period) / 100)
+        return float(self._import_rate_cents(period) / 100)
 
 
 class DteExportRateSensor(_DteBaseRateSensor):
@@ -312,7 +413,11 @@ class DteExportRateSensor(_DteBaseRateSensor):
         period = self._active_period()
         if period is not None:
             attrs[ATTR_EXPORT_RATE_SOURCE] = self._export_rate_source(period)
-            attrs[ATTR_RIDER18_EXPORT_AVAILABLE] = rider18_export_formula_available(period, self._pscr_cents_for_rate())
+            attrs[ATTR_RIDER18_EXPORT_AVAILABLE] = rider18_export_formula_available(
+                period,
+                self._pscr_cents_for_rate(),
+                self._include_pscr(),
+            )
             warning = self._export_rate_warning(period)
             if warning is not None:
                 attrs[ATTR_EXPORT_RATE_WARNING] = warning
@@ -322,6 +427,9 @@ class DteExportRateSensor(_DteBaseRateSensor):
         if period is None:
             return None
         return float(self._export_rate_cents(period) / 100)
+
+    def _period_calculation(self, period: SeasonalPeriodRate) -> dict:
+        return self._export_rate_calculation(period)
 
 
 class DteCurrentRateNameSensor(_DteBaseRateSensor):
@@ -349,7 +457,7 @@ class DteCurrentRateNameSensor(_DteBaseRateSensor):
     def _period_value_usd(self, period: SeasonalPeriodRate | None) -> float | None:
         if period is None:
             return None
-        return float(current_import_rate_cents(period) / 100)
+        return float(self._import_rate_cents(period) / 100)
 
 
 class DteRateScheduleSensor(_DteBaseRateSensor):
@@ -390,7 +498,7 @@ class DteRateScheduleSensor(_DteBaseRateSensor):
                     "period": period.period_name,
                     "name": period_display_name(period),
                     "time_window": self._window_summary(period),
-                    "import_usd_per_kwh": round(float(current_import_rate_cents(period) / 100), 6),
+                    "import_usd_per_kwh": round(float(self._import_rate_cents(period) / 100), 6),
                     "export_usd_per_kwh": round(float(self._export_rate_cents(period) / 100), 6),
                 }
             )
@@ -416,4 +524,4 @@ class DteRateScheduleSensor(_DteBaseRateSensor):
     def _period_value_usd(self, period: SeasonalPeriodRate | None) -> float | None:
         if period is None:
             return None
-        return float(current_import_rate_cents(period) / 100)
+        return float(self._import_rate_cents(period) / 100)

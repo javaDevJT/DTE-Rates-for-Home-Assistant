@@ -37,6 +37,13 @@ def _stub_homeassistant() -> None:
         def async_create_entry(self, *, title, data):
             return FlowResult(type="create_entry", title=title, data=data)
 
+    class OptionsFlow:
+        def async_show_form(self, *, step_id, data_schema=None, errors=None, **kwargs):
+            return FlowResult(type="form", step_id=step_id, data_schema=data_schema, errors=errors or {}, **kwargs)
+
+        def async_create_entry(self, *, title, data):
+            return FlowResult(type="create_entry", title=title, data=data)
+
     class ConfigEntry:
         pass
 
@@ -109,6 +116,7 @@ def _stub_homeassistant() -> None:
             ConfigFlow=ConfigFlow,
             ConfigEntry=ConfigEntry,
             FlowResult=FlowResult,
+            OptionsFlow=OptionsFlow,
         ),
         "homeassistant.data_entry_flow": _make_module("homeassistant.data_entry_flow", FlowResult=FlowResult),
         "homeassistant.core": _make_module("homeassistant.core", HomeAssistant=HomeAssistant, callback=callback),

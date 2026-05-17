@@ -10,6 +10,7 @@ from custom_components.dte_rates.rate_calculator import (
     get_active_period,
     get_next_rate_change,
     period_display_name,
+    rider18_export_formula_available,
 )
 
 
@@ -67,11 +68,38 @@ def test_import_is_total_of_all_per_kwh_components():
     assert current_import_rate_cents(active) == Decimal("24.133")
 
 
+def test_import_can_include_pscr_and_tax():
+    rate = _rate_plan()
+    active = get_active_period(rate, datetime(2026, 6, 1, 16, 30))
+    assert active is not None
+
+    assert current_import_rate_cents(
+        active,
+        pscr_cents=Decimal("1.877"),
+        include_pscr=True,
+        tax_rate_percent=Decimal("4.0"),
+    ) == Decimal("27.05040")
+
+
 def test_rider18_export_without_net_metering_matches_spreadsheet_generation_plus_pscr():
     rate = _rate_plan()
     active = get_active_period(rate, datetime(2026, 6, 1, 16, 30))
     assert active is not None
     assert current_export_rate_cents(active, net_metering=False, pscr_cents=Decimal("1.877")) == Decimal("16.284")
+
+
+def test_rider18_export_can_omit_pscr_when_toggled_off():
+    rate = _rate_plan()
+    active = get_active_period(rate, datetime(2026, 6, 1, 16, 30))
+    assert active is not None
+
+    assert current_export_rate_cents(
+        active,
+        net_metering=False,
+        pscr_cents=Decimal("1.877"),
+        include_pscr=False,
+    ) == Decimal("14.407")
+    assert rider18_export_formula_available(active, None, include_pscr=False) is True
 
 
 def test_rider18_export_excludes_unrelated_non_formula_components():
@@ -96,6 +124,20 @@ def test_export_with_net_metering_uses_total():
     active = get_active_period(rate, datetime(2026, 6, 1, 16, 30))
     assert active is not None
     assert current_export_rate_cents(active, net_metering=True) == Decimal("24.133")
+
+
+def test_net_metering_export_uses_import_modifiers():
+    rate = _rate_plan()
+    active = get_active_period(rate, datetime(2026, 6, 1, 16, 30))
+    assert active is not None
+
+    assert current_export_rate_cents(
+        active,
+        net_metering=True,
+        pscr_cents=Decimal("1.877"),
+        include_pscr=True,
+        tax_rate_percent=Decimal("4.0"),
+    ) == Decimal("27.05040")
 
 
 def test_multiple_hour_ranges_supported_for_same_period():

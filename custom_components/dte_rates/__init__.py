@@ -13,6 +13,7 @@ from homeassistant.components import persistent_notification
 from .const import CONF_NET_METERING, CONF_SELECTED_RATE, DOMAIN
 from .coordinator import DteRateCoordinator
 from .rate_calculator import current_export_rate_cents, current_import_rate_cents, period_display_name
+from .settings import entry_include_pscr, entry_tax_rate_percent
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 SERVICE_REFRESH_RATE_CARD = "refresh_rate_card"
@@ -123,9 +124,13 @@ def _make_show_schedule_handler(hass: HomeAssistant):
         lines_by_season: dict[str, list[str]] = defaultdict(list)
         net_metering = entry.data.get(CONF_NET_METERING, False) if entry else False
         pscr_cents = getattr(coordinator.data, "pscr_rates", {}).get(rate.code)
+        include_pscr = entry_include_pscr(entry) if entry else True
+        tax_rate_percent = entry_tax_rate_percent(entry) if entry else None
         for period in sorted(rate.periods, key=lambda p: (p.season_name, p.period_name)):
-            import_usd = float(current_import_rate_cents(period) / 100)
-            export_usd = float(current_export_rate_cents(period, net_metering, pscr_cents) / 100)
+            import_usd = float(current_import_rate_cents(period, pscr_cents, include_pscr, tax_rate_percent) / 100)
+            export_usd = float(
+                current_export_rate_cents(period, net_metering, pscr_cents, include_pscr, tax_rate_percent) / 100
+            )
             lines_by_season[period.season_name].append(
                 f"{period_display_name(period)}: Import ${import_usd:.4f}/kWh | Export ${export_usd:.4f}/kWh"
             )

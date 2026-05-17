@@ -7,7 +7,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from homeassistant.components import persistent_notification
-from custom_components.dte_rates.const import CONF_NET_METERING, CONF_SELECTED_RATE
+from custom_components.dte_rates.const import (
+    CONF_INCLUDE_PSCR,
+    CONF_NET_METERING,
+    CONF_SELECTED_RATE,
+    CONF_TAX_RATE,
+)
 from custom_components.dte_rates.models import ParsedRateCard, PriceComponents, RatePlan, SeasonalPeriodRate, TimeWindow
 from custom_components.dte_rates.sensor import (
     DteCurrentRateNameSensor,
@@ -48,18 +53,57 @@ def _coordinator_with_rate() -> SimpleNamespace:
     )
 
 
-def test_import_sensor_returns_total_rate(monkeypatch):
+def test_import_sensor_returns_default_out_of_pocket_rate(monkeypatch):
     monkeypatch.setattr("custom_components.dte_rates.sensor.dt_util.now", lambda: datetime(2026, 3, 1, 12, 0))
 
     coordinator = _coordinator_with_rate()
     entry = SimpleNamespace(entry_id="entry_1", data={CONF_SELECTED_RATE: "D1.11", CONF_NET_METERING: False})
 
     sensor = DteImportRateSensor(coordinator, entry)
-    assert sensor.native_value == 0.06
+    assert sensor.native_value == pytest.approx(0.0819208)
     assert sensor.native_unit_of_measurement == "USD/kWh"
-    assert sensor.extra_state_attributes["selected_rate_available"] is True
-    assert sensor.extra_state_attributes["current_rate_name"] == "All kWh"
-    assert sensor.extra_state_attributes["next_rate_change"] is None
+    attrs = sensor.extra_state_attributes
+    assert attrs["selected_rate_available"] is True
+    assert attrs["current_rate_name"] == "All kWh"
+    assert attrs["next_rate_change"] is None
+    assert attrs["include_pscr"] is True
+    assert attrs["tax_rate_percent"] == 4.0
+    assert attrs["current_rate_formula"] == "((base 6.0000 + PSCR 1.8770) * (1 + tax 4.0000%)) / 100 = $0.081921/kWh"
+    assert attrs["current_rate_calculation"] == {
+        "mode": "import",
+        "base_cents_per_kwh": 6.0,
+        "pscr_cents_per_kwh": 1.877,
+        "pscr_included": True,
+        "tax_rate_percent": 4.0,
+        "tax_applied": True,
+        "pre_tax_cents_per_kwh": 7.877,
+        "tax_cents_per_kwh": 0.31508,
+        "total_cents_per_kwh": 8.19208,
+        "total_usd_per_kwh": 0.0819208,
+        "formula": "((base 6.0000 + PSCR 1.8770) * (1 + tax 4.0000%)) / 100 = $0.081921/kWh",
+    }
+
+
+def test_import_sensor_can_omit_modifiers(monkeypatch):
+    monkeypatch.setattr("custom_components.dte_rates.sensor.dt_util.now", lambda: datetime(2026, 3, 1, 12, 0))
+
+    coordinator = _coordinator_with_rate()
+    entry = SimpleNamespace(
+        entry_id="entry_17",
+        data={
+            CONF_SELECTED_RATE: "D1.11",
+            CONF_NET_METERING: False,
+            CONF_INCLUDE_PSCR: False,
+            CONF_TAX_RATE: "0",
+        },
+    )
+
+    sensor = DteImportRateSensor(coordinator, entry)
+    attrs = sensor.extra_state_attributes
+
+    assert sensor.native_value == 0.06
+    assert attrs["include_pscr"] is False
+    assert attrs["tax_rate_percent"] == 0.0
 
 
 def test_export_sensor_uses_rider18_formula_without_net_metering(monkeypatch):
@@ -75,6 +119,11 @@ def test_export_sensor_uses_rider18_formula_without_net_metering(monkeypatch):
     assert sensor.extra_state_attributes["rider18_export_available"] is True
     assert sensor.extra_state_attributes["pscr_cents"] == 1.877
     assert sensor.extra_state_attributes["pscr_rate_code"] == "D1.11"
+    assert (
+        sensor.extra_state_attributes["current_rate_formula"]
+        == "(generation 3.0000 + PSCR 1.8770) / 100 = $0.048770/kWh"
+    )
+    assert sensor.extra_state_attributes["current_rate_calculation"]["tax_applied"] is False
 
 
 def test_export_sensor_ignores_rider18_credit_with_net_metering(monkeypatch):
@@ -84,8 +133,10 @@ def test_export_sensor_ignores_rider18_credit_with_net_metering(monkeypatch):
     entry = SimpleNamespace(entry_id="entry_14", data={CONF_SELECTED_RATE: "D1.11", CONF_NET_METERING: True})
 
     sensor = DteExportRateSensor(coordinator, entry)
-    assert sensor.native_value == 0.06
+    assert sensor.native_value == pytest.approx(0.0819208)
     assert sensor.extra_state_attributes["export_rate_source"] == "net_metering"
+    assert sensor.extra_state_attributes["current_rate_calculation"]["mode"] == "net_metering_export"
+    assert "net metering export" in sensor.extra_state_attributes["current_rate_formula"]
 
 
 def test_export_sensor_reports_formula_unavailable_without_pscr(monkeypatch):
@@ -162,7 +213,7 @@ def test_schedule_sensor_exposes_full_schedule(monkeypatch):
 
     assert sensor.native_value == "D1.11 (1 periods)"
     assert len(attrs["schedule_by_season"]) == 1
-    assert "Import $0.0600/kWh" in attrs["schedule_text"]
+    assert "Import $0.0819/kWh" in attrs["schedule_text"]
     assert "Export $0.0488/kWh" in attrs["schedule_text"]
     assert attrs["schedule_by_season"][0]["export_usd_per_kwh"] == 0.04877
     assert attrs["next_rate_value"] is None
@@ -205,7 +256,7 @@ def test_schedule_sensor_next_rate_value_defaults_to_import(monkeypatch):
     sensor = DteRateScheduleSensor(coordinator, entry)
     attrs = sensor.extra_state_attributes
 
-    assert attrs["next_rate_value"] == 0.07
+    assert attrs["next_rate_value"] == pytest.approx(0.0923208)
 
 
 def test_entities_publish_service_device_info(monkeypatch):
