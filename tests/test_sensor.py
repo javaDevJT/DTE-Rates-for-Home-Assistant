@@ -84,6 +84,23 @@ def test_import_sensor_returns_default_out_of_pocket_rate(monkeypatch):
     }
 
 
+def test_rate_price_sensors_do_not_set_invalid_monetary_state_class(monkeypatch):
+    monkeypatch.setattr("custom_components.dte_rates.sensor.dt_util.now", lambda: datetime(2026, 3, 1, 12, 0))
+
+    coordinator = _coordinator_with_rate()
+    entry = SimpleNamespace(entry_id="entry_18", data={CONF_SELECTED_RATE: "D1.11", CONF_NET_METERING: False})
+
+    import_sensor = DteImportRateSensor(coordinator, entry)
+    export_sensor = DteExportRateSensor(coordinator, entry)
+
+    assert getattr(import_sensor, "_attr_device_class", None) == "monetary"
+    assert getattr(export_sensor, "_attr_device_class", None) == "monetary"
+    assert import_sensor.native_unit_of_measurement == "USD/kWh"
+    assert export_sensor.native_unit_of_measurement == "USD/kWh"
+    assert getattr(import_sensor, "_attr_state_class", None) is None
+    assert getattr(export_sensor, "_attr_state_class", None) is None
+
+
 def test_import_sensor_can_omit_modifiers(monkeypatch):
     monkeypatch.setattr("custom_components.dte_rates.sensor.dt_util.now", lambda: datetime(2026, 3, 1, 12, 0))
 

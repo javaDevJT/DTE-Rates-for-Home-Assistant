@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from decimal import Decimal
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -76,7 +76,6 @@ async def async_setup_entry(
 class _DteBaseRateSensor(CoordinatorEntity, SensorEntity):
     _attr_native_unit_of_measurement = "USD/kWh"
     _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)

@@ -12,3 +12,4 @@ Current research notes:
 
 - `research/rider18-export-rates.md` - Rider 18 export-rate source mapping and PSCR formula decisions.
 - `research/issue-3-rate-modifiers.md` - PSCR/tax modifier defaults and calculation scope for real out-of-pocket rates.
+- `research/issue-5-entity-type.md` - Home Assistant monetary sensor state-class warning and entity metadata decision.
