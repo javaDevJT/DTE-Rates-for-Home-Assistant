@@ -3,7 +3,6 @@ set -Eeuo pipefail
 
 CORE_REPOSITORY="https://github.com/home-assistant/core.git"
 CORE_COMMIT="abe1fdd7cd6b4de1715c87b6fd87d92699514ef9"
-HA_WHEEL_INDEX="https://wheels.home-assistant.io/musllinux-index/"
 
 usage() {
   echo "Usage: bash .github/scripts/ha-validators.sh hassfest [hassfest arguments...]" >&2
@@ -182,7 +181,9 @@ UV_EXTRA_INDEX_URL="" "$venv_uv" pip install --python "$venv_python" --no-build 
   "pipdeptree==$pipdeptree_version" \
   "tqdm==$tqdm_version" \
   "ruff==$ruff_version"
-UV_EXTRA_INDEX_URL="$HA_WHEEL_INDEX" "$venv_uv" pip install --python "$venv_python" --no-build \
+# Core's upstream Hassfest image is Alpine and uses the musllinux wheel index.
+# This native runner is glibc-based, so resolve the same pins from PyPI instead.
+UV_EXTRA_INDEX_URL="" "$venv_uv" pip install --python "$venv_python" --no-build \
   -c "$core_source/homeassistant/package_constraints.txt" \
   -r "$core_source/requirements.txt"
 # Validate the pinned native dependency, including PyTurboJPEG 1.8.3's
