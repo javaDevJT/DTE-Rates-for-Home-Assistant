@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Create minimal, credential-free BuildKit contexts for pinned Hassfest."""
+"""Create curated BuildKit contexts with known credential paths omitted."""
 
 from __future__ import annotations
 
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import sys
 
@@ -52,6 +53,49 @@ PRIVATE_KEY_STEMS = {
     "id_xmss",
 }
 SECRET_SUFFIXES = {".key", ".p12", ".pem", ".pfx", ".secret", ".token"}
+SOURCE_SUFFIXES = {
+    ".bash",
+    ".c",
+    ".cc",
+    ".cpp",
+    ".css",
+    ".go",
+    ".h",
+    ".hpp",
+    ".html",
+    ".java",
+    ".js",
+    ".jsx",
+    ".jinja",
+    ".jinja2",
+    ".kt",
+    ".m",
+    ".mm",
+    ".php",
+    ".py",
+    ".pyi",
+    ".rs",
+    ".sh",
+    ".swift",
+    ".ts",
+    ".tsx",
+    ".vue",
+}
+SENSITIVE_NAME_COMPONENTS = {
+    "api",
+    "apikey",
+    "auth",
+    "authorization",
+    "credential",
+    "credentials",
+    "key",
+    "password",
+    "passwd",
+    "secret",
+    "secrets",
+    "token",
+    "tokens",
+}
 
 
 class ContextError(Exception):
@@ -61,15 +105,35 @@ class ContextError(Exception):
 def is_secret(path: Path) -> bool:
     name = path.name.casefold()
     stem = path.stem.casefold()
+    suffix = path.suffix.casefold()
+    # Keep source code even when its filename contains a sensitive term.
+    # This is a filename filter for common credential data, not a scanner for
+    # arbitrary strings embedded in source or other retained resources.
+    if suffix in SOURCE_SUFFIXES:
+        return False
+
+    stem_components = set(re.split(r"[^a-z0-9]+", stem))
     return (
         name in SECRET_NAMES
         or name == ".env"
         or name.startswith(".env.")
         or name in {"credential", "credentials", "secret", "secrets", "git-credentials"}
-        or name.startswith(("credential.", "credentials.", "secret.", "secrets.", "secret-", "secrets-", "secret_", "secrets_"))
+        or name.startswith(
+            (
+                "credential.",
+                "credentials.",
+                "secret.",
+                "secrets.",
+                "secret-",
+                "secrets-",
+                "secret_",
+                "secrets_",
+            )
+        )
+        or bool(stem_components & SENSITIVE_NAME_COMPONENTS)
         or stem in PRIVATE_KEY_STEMS
         or name.startswith(("service-account", "service_account"))
-        or path.suffix.casefold() in SECRET_SUFFIXES
+        or suffix in SECRET_SUFFIXES
     )
 
 
@@ -225,7 +289,14 @@ def prepare_context(workspace_value: str, output_value: str, arguments: list[str
         if (workspace / "manifest.json").is_file():
             _copy_tree(workspace, workspace_context)
         elif (workspace / "custom_components").is_dir():
-            _copy_tree(workspace / "custom_components", workspace_context / "custom_components")
+            custom_components = (workspace / "custom_components").resolve(strict=True)
+            try:
+                custom_components.relative_to(workspace)
+            except ValueError as err:
+                raise ContextError(
+                    "Refusing normal-discovery custom_components root outside GITHUB_WORKSPACE"
+                ) from err
+            _copy_tree(custom_components, workspace_context / "custom_components")
         container_args = rewritten
 
     (arguments_context / "argv.json").write_text(
